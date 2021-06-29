@@ -67,7 +67,10 @@ def processes_jobs(procID):
     elif request.method == 'POST':
         status_code = 201
         req_vals = request.values
-        status_url = exec_job(req_vals["inputs"])
+        status_url = exec_job(req_vals["inputs"], # array
+                              req_vals["outputs"], # array
+                              req_vals["mode"], # sync | async | auto
+                              req_vals["response"]) # raw | document
         resp_dict = {"Location": status_url}
     return resp_dict, status_code, {'ContentType':'application/json'}
 

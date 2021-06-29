@@ -27,7 +27,7 @@ def get_jobs():
     return jobs
 
 def get_job(proc_id, job_id):
-    # Required fields:
+    # Required fields in job_info response dict:
     #   jobID (str)
     #   status (str) in ["accepted" | "running" | "succeeded" | "failed"]
     # Optional fields:
@@ -38,7 +38,7 @@ def get_job(proc_id, job_id):
     job_info = {"jobID": job_id, "status": "running"}
     return job_info
 
-def exec_job(inputs):
+def exec_job(inputs, outputs, mode, response):
     job_id = "job5"
     status_url = "https://myhost/status/{}".format(job_id)
     return status_url
