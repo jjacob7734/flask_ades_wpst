@@ -1,7 +1,14 @@
+import argparse
 from flask import Flask, request, Response
 import json
 from flask_ades_wpst.ades_base import get_procs, get_proc, deploy_proc, undeploy_proc, get_jobs, get_job, exec_job, dismiss_job, get_job_results
 
+def parse_args():
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument("-H", "--host", default="127.0.0.1",
+                        help="host IP address for Flask server")
+    args = parser.parse_args()
+    return args.host
 
 app = Flask(__name__)
 
@@ -95,9 +102,10 @@ def processes_result(procID, jobID):
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 
-def flask_wpst(app, debug=False):
-    app.run(debug=debug)
+def flask_wpst(app, debug=False, host="127.0.0.1"):
+    app.run(debug=debug, host=host)
     
 
 if __name__ == "__main__":
-    flask_wpst(app)
+    host = parse_args()
+    flask_wpst(app, debug=False, host=host)
