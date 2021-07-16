@@ -101,7 +101,6 @@ def processes_result(procID, jobID):
     status_code = 200
     return resp_dict, status_code, {'ContentType':'application/json'}
 
-
 def flask_wpst(app, debug=False, host="127.0.0.1"):
     app.run(debug=debug, host=host)
     
