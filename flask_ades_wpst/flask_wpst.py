@@ -1,6 +1,6 @@
 from flask import Flask, request, Response
 import json
-from ades_base import get_procs, get_proc, deploy_proc, undeploy_proc, get_jobs, get_job, exec_job, dismiss_job, get_job_results
+from flask_ades_wpst.ades_base import get_procs, get_proc, deploy_proc, undeploy_proc, get_jobs, get_job, exec_job, dismiss_job, get_job_results
 
 
 app = Flask(__name__)
@@ -95,5 +95,9 @@ def processes_result(procID, jobID):
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 
+def flask_wpst(app, debug=False):
+    app.run(debug=debug)
+    
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    flask_wpst(app)
