@@ -54,7 +54,7 @@ def processes_id(procID):
     resp_dict = {}
     status_code = 200
     if request.method == 'GET':
-        resp_dict = {"processOffering": {"process": get_proc(procID)}}
+        resp_dict = {"process": get_proc(procID)}
     elif request.method == "DELETE":
         resp_dict = {"undeploymentResult": undeploy_proc(procID)}
     return resp_dict, status_code, {'ContentType':'application/json'}
