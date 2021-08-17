@@ -1,26 +1,39 @@
+import sys
+import requests
+from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_deploy_proc, sqlite_get_proc, sqlite_undeploy_proc
+
+def proc_dict(proc):
+    return {"id": proc[0],
+            "title": proc[1],
+            "abstract": proc[2],
+            "keywords": proc[3],
+            "owsContextURL": proc[4],
+            "processVersion": proc[5],
+            "jobControlOptions": proc[6],
+            "outputTransmission": proc[7],
+            "immediateDeployment": str(bool(proc[8])).lower(),
+            "executionUnit": proc[9]}
+
 def get_procs():
-    procs = [{"processSummary": {"id":"proc1",
-                                 "title": "proc1 title",
-                                 "abstract": "proc1_abstract",
-                                 "keywords": "proc1_keywords"}},
-             {"processSummary": {"id":"proc2",
-                                 "title": "proc2 title",
-                                 "abstract": "proc2_abstract",
-                                 "keywords": "proc2_keywords"}}]
+    saved_procs = sqlite_get_procs()
+    procs = [{"processSummary": proc_dict(saved_proc)}
+             for saved_proc in saved_procs]
     return procs
 
 def get_proc(proc_id):
-    proc_info = {"id": proc_id, "title": "my process title",
-                 "inputs": [], "outputs": [],
-                 "executionEndpoint": "https://myhost/endpoint"}
-    return proc_info
+    proc_desc = sqlite_get_proc(proc_id)
+    return proc_dict(proc_desc)
 
-def deploy_proc(proc_spec):
+def deploy_proc(app_desc_url):
+    response = requests.get(app_desc_url)
+    if response.status_code == 200:
+        proc_spec = response.json()
+        sqlite_deploy_proc(proc_spec)
     return proc_spec
             
 def undeploy_proc(proc_id):
-    proc_info = {"id": proc_id}
-    return proc_info
+    proc_desc = sqlite_undeploy_proc(proc_id)
+    return proc_dict(proc_desc)
 
 def get_jobs():
     jobs = ["job1", "job2", "job3"]

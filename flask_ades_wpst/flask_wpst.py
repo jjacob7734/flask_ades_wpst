@@ -42,11 +42,10 @@ def processes():
     if request.method == 'GET':
         # Retrieve available processes
         proc_list = get_procs()
-        resp_dict = {"processCollection": {"processes": proc_list}}
+        resp_dict = {"processes": proc_list}
     elif request.method == 'POST':
         req_vals = request.values
-        proc_spec = {"executionUnit": [{"href": req_vals["container"]}]}
-        proc_info = deploy_proc(proc_spec)
+        proc_info = deploy_proc(req_vals["proc"])
         resp_dict = {"deploymentResult": {"processSummary": proc_info}}
     return resp_dict, status_code, {'ContentType':'application/json'}
 
@@ -55,12 +54,7 @@ def processes_id(procID):
     resp_dict = {}
     status_code = 200
     if request.method == 'GET':
-        resp_dict = {"processOffering": {"process": get_proc(procID),
-                                         "processVersion": "version",
-                                         "jobControlOptions": ["sync-execute",
-                                                               "async-execute"],
-                                         "outputTransmission": ["value",
-                                                                "reference"]}}
+        resp_dict = {"processOffering": {"process": get_proc(procID)}}
     elif request.method == "DELETE":
         resp_dict = {"undeploymentResult": undeploy_proc(procID)}
     return resp_dict, status_code, {'ContentType':'application/json'}
@@ -107,4 +101,4 @@ def flask_wpst(app, debug=False, host="127.0.0.1"):
 
 if __name__ == "__main__":
     host = parse_args()
-    flask_wpst(app, debug=False, host=host)
+    flask_wpst(app, debug=True, host=host)
