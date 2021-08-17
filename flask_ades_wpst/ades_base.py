@@ -9,15 +9,14 @@ def proc_dict(proc):
             "keywords": proc[3],
             "owsContextURL": proc[4],
             "processVersion": proc[5],
-            "jobControlOptions": proc[6],
-            "outputTransmission": proc[7],
+            "jobControlOptions": proc[6].split(','),
+            "outputTransmission": proc[7].split(','),
             "immediateDeployment": str(bool(proc[8])).lower(),
             "executionUnit": proc[9]}
 
 def get_procs():
     saved_procs = sqlite_get_procs()
-    procs = [{"processSummary": proc_dict(saved_proc)}
-             for saved_proc in saved_procs]
+    procs = [proc_dict(saved_proc) for saved_proc in saved_procs]
     return procs
 
 def get_proc(proc_id):
