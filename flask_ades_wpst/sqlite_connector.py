@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import datetime
 
 db_name = "soamc_ades.db"
 
@@ -49,7 +50,11 @@ def sqlite_db(func):
                                           executionUnit TEXT
                                         );"""
             sql_create_jobs_table = """CREATE TABLE IF NOT EXISTS jobs (
-                                          id TEXT PRIMARY KEY
+                                         jobID TEXT PRIMARY KEY,
+                                         inputs BLOB,
+                                         outputs BLOB,
+                                         status TEXT,
+                                         timestamp TEXT
                                        );"""
             create_table(conn, sql_create_procs_table)
             create_table(conn, sql_create_jobs_table)
@@ -109,3 +114,62 @@ def sqlite_undeploy_proc(proc_id):
     cur.execute(sql_str)
     conn.commit()
     return proc_desc
+
+def sqlite_get_headers(cur, tname):
+    sql_str = "SELECT name FROM PRAGMA_TABLE_INFO(\"{}\");".format(tname)
+    cur.execute(sql_str)
+    col_headers = [t[0] for t in cur.fetchall()]
+    return col_headers
+
+@sqlite_db
+def sqlite_get_jobs():
+    conn = create_connection(db_name)
+    cur = conn.cursor()
+    sql_str = "SELECT * FROM jobs"
+    cur.execute(sql_str)
+    job_list = cur.fetchall()
+    col_headers = sqlite_get_headers(cur, "jobs")
+    job_dicts = [dict(zip(col_headers, job)) for job in job_list]
+    return job_dicts
+
+@sqlite_db
+def sqlite_get_job(job_id):
+    conn = create_connection(db_name)
+    cur = conn.cursor()
+    sql_str = """SELECT * FROM jobs
+                 WHERE jobID = \"{}\"""".format(job_id)
+    job = cur.execute(sql_str).fetchall()[0]
+    print("job=", job)
+    col_headers = sqlite_get_headers(cur, "jobs")
+    print("col_headers=", col_headers)
+    job_dict = dict(zip(col_headers, job))
+    print("job_dict=", job_dict)
+    return job_dict
+
+@sqlite_db
+def sqlite_exec_job(job_id, job_spec):
+    conn = create_connection(db_name)
+    cur = conn.cursor()
+    sql_str = """INSERT INTO jobs(jobID, inputs, outputs, status, timestamp)
+                 VALUES(\"{}\", \"{}\", \"{}\", \"{}\", \"{}\");""".\
+                 format(job_id, job_spec["inputs"], job_spec["outputs"],
+                        "accepted", datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
+    cur.execute(sql_str)
+    conn.commit()
+    return sqlite_get_job(job_id)
+
+@sqlite_db
+def sqlite_dismiss_job(job_id):
+    conn = create_connection(db_name)
+    cur = conn.cursor()
+    sql_str = """UPDATE jobs
+                 SET status = \"{}\",
+                     timestamp = \"{}\"
+                 WHERE jobID = \"{}\"""".\
+                 format("dismissed",
+                        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        job_id)
+    cur.execute(sql_str)
+    conn.commit()
+    return sqlite_get_job(job_id)
+

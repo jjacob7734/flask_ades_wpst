@@ -64,15 +64,13 @@ def processes_jobs(procID):
     if request.method == 'GET':
         status_code = 200
         job_list = get_jobs()
-        resp_dict = {"jobCollection": {"jobs": job_list}}
+        resp_dict = {"jobs": job_list}
     elif request.method == 'POST':
         status_code = 201
         req_vals = request.values
-        status_url = exec_job(req_vals["inputs"], # array
-                              req_vals["outputs"], # array
-                              req_vals["mode"], # sync | async | auto
-                              req_vals["response"]) # raw | document
-        resp_dict = {"Location": status_url}
+        job_info = exec_job(req_vals["job"])
+#        resp_dict = {"Location": status_url}
+        resp_dict = job_info
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 @app.route("/processes/<procID>/jobs/<jobID>", methods = ['GET', 'DELETE'])

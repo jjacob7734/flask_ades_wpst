@@ -1,6 +1,7 @@
 import sys
 import requests
-from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_deploy_proc, sqlite_get_proc, sqlite_undeploy_proc
+from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_get_proc, sqlite_deploy_proc, sqlite_undeploy_proc, sqlite_get_jobs, sqlite_get_job, sqlite_exec_job, sqlite_dismiss_job
+import hashlib
 
 def proc_dict(proc):
     return {"id": proc[0],
@@ -23,8 +24,8 @@ def get_proc(proc_id):
     proc_desc = sqlite_get_proc(proc_id)
     return proc_dict(proc_desc)
 
-def deploy_proc(app_desc_url):
-    response = requests.get(app_desc_url)
+def deploy_proc(proc_desc_url):
+    response = requests.get(proc_desc_url)
     if response.status_code == 200:
         proc_spec = response.json()
         sqlite_deploy_proc(proc_spec)
@@ -35,7 +36,7 @@ def undeploy_proc(proc_id):
     return proc_dict(proc_desc)
 
 def get_jobs():
-    jobs = ["job1", "job2", "job3"]
+    jobs = sqlite_get_jobs()
     return jobs
 
 def get_job(proc_id, job_id):
@@ -50,15 +51,17 @@ def get_job(proc_id, job_id):
     job_info = {"jobID": job_id, "status": "running"}
     return job_info
 
-def exec_job(inputs, outputs, mode, response):
-    job_id = "job5"
-    status_url = "https://myhost/status/{}".format(job_id)
-    return status_url
+def exec_job(job_desc_url):
+    response = requests.get(job_desc_url)
+    if response.status_code == 200:
+        job_spec = response.json()
+        job_id = hashlib.sha1(job_desc_url.encode()).hexdigest()
+        sqlite_exec_job(job_id, job_spec)
+    return job_spec
             
 def dismiss_job(proc_id, job_id):
-    job_status = "canceled" # what string to use here?
-    dismiss_status = {"jobID": job_id, "status": job_status}
-    return dismiss_status
+    job_spec = sqlite_dismiss_job(job_id)
+    return job_spec
 
 def get_job_results(proc_id, job_id):
     job_results = ["file:///path/to/result1",
