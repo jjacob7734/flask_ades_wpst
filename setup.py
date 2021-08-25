@@ -12,6 +12,7 @@ setup(
     url="https://github.jpl.nasa.gov/SOAMC/flask_ades_wpst.git",
     project_urls={
         "Source Code": "https://github.jpl.nasa.gov/SOAMC/flask_ades_wpst.git",
+        "Container": "https://hub.docker.com/r/jjacob7734/flask-ades-wpst"
     },
     install_requires=[
         "Flask==1.1.2",
