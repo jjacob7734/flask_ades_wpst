@@ -85,12 +85,8 @@ def processes_job(procID, jobID):
     
 @app.route("/processes/<procID>/jobs/<jobID>/result", methods = ['GET'])
 def processes_result(procID, jobID):
-    job_outputs = get_job_results(procID, jobID)
-    job_outputs_json = [{"href": jout} for jout in job_outputs]
-    resp_dict = {"result":
-                 {"outputInfo":
-                  {"id": jobID, "outputs": job_outputs_json}}}
     status_code = 200
+    resp_dict = get_job_results(procID, jobID)
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 def flask_wpst(app, debug=False, host="127.0.0.1"):

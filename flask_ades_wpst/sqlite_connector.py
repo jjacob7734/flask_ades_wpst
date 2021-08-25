@@ -139,11 +139,8 @@ def sqlite_get_job(job_id):
     sql_str = """SELECT * FROM jobs
                  WHERE jobID = \"{}\"""".format(job_id)
     job = cur.execute(sql_str).fetchall()[0]
-    print("job=", job)
     col_headers = sqlite_get_headers(cur, "jobs")
-    print("col_headers=", col_headers)
     job_dict = dict(zip(col_headers, job))
-    print("job_dict=", job_dict)
     return job_dict
 
 @sqlite_db
