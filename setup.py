@@ -14,6 +14,7 @@ setup(
         "Source Code": "https://github.jpl.nasa.gov/SOAMC/flask_ades_wpst.git",
     },
     install_requires=[
-        "Flask==1.1.2"
+        "Flask==1.1.2",
+        "requests==2.24.0"
     ]
 )
