@@ -2,7 +2,7 @@ import sys
 import requests
 import hashlib
 from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_get_proc, sqlite_deploy_proc, sqlite_undeploy_proc, sqlite_get_jobs, sqlite_get_job, sqlite_exec_job, sqlite_dismiss_job
-
+from datetime import datetime
 
 class ADES_Base:
 
@@ -79,10 +79,11 @@ class ADES_Base:
         return job_info
 
     def exec_job(self, job_desc_url):
+        now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
         response =requests.get(job_desc_url)
         if response.status_code == 200:
             job_spec = response.json()
-            job_id = hashlib.sha1(job_desc_url.encode()).hexdigest()
+            job_id = hashlib.sha1((response.text + now).encode()).hexdigest()
             sqlite_exec_job(job_id, job_spec)
             ades_resp = self._ades.exec_job(job_spec)
         return job_spec
