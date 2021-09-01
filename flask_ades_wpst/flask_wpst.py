@@ -1,7 +1,8 @@
 import argparse
 from flask import Flask, request, Response
 import json
-from flask_ades_wpst.ades_base import get_procs, get_proc, deploy_proc, undeploy_proc, get_jobs, get_job, exec_job, dismiss_job, get_job_results
+import os
+from flask_ades_wpst.ades_base import ADES_Base
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
@@ -39,13 +40,14 @@ def root():
 def processes():
     resp_dict = {}
     status_code = 200
+    ades_base = ADES_Base(app.config)
     if request.method == 'GET':
         # Retrieve available processes
-        proc_list = get_procs()
+        proc_list = ades_base.get_procs()
         resp_dict = {"processes": proc_list}
     elif request.method == 'POST':
         req_vals = request.values
-        proc_info = deploy_proc(req_vals["proc"])
+        proc_info = ades_base.deploy_proc(req_vals["proc"])
         resp_dict = {"deploymentResult": {"processSummary": proc_info}}
     return resp_dict, status_code, {'ContentType':'application/json'}
 
@@ -53,46 +55,56 @@ def processes():
 def processes_id(procID):
     resp_dict = {}
     status_code = 200
+    ades_base = ADES_Base(app.config)
     if request.method == 'GET':
-        resp_dict = {"process": get_proc(procID)}
+        resp_dict = {"process": ades_base.get_proc(procID)}
     elif request.method == "DELETE":
-        resp_dict = {"undeploymentResult": undeploy_proc(procID)}
+        resp_dict = {"undeploymentResult": ades_base.undeploy_proc(procID)}
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 @app.route("/processes/<procID>/jobs", methods = ['GET', 'POST'])
 def processes_jobs(procID):
+    ades_base = ADES_Base(app.config)
     if request.method == 'GET':
         status_code = 200
-        job_list = get_jobs()
+        job_list = ades_base.get_jobs()
         resp_dict = {"jobs": job_list}
     elif request.method == 'POST':
         status_code = 201
         req_vals = request.values
-        job_info = exec_job(req_vals["job"])
-#        resp_dict = {"Location": status_url}
+        job_info = ades_base.exec_job(req_vals["job"])
         resp_dict = job_info
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 @app.route("/processes/<procID>/jobs/<jobID>", methods = ['GET', 'DELETE'])
 def processes_job(procID, jobID):
     status_code = 200
+    ades_base = ADES_Base(app.config)
     if request.method == 'GET':
-        resp_dict = {"statusInfo": get_job(procID, jobID)}
+        resp_dict = {"statusInfo": ades_base.get_job(procID, jobID)}
     elif request.method == 'DELETE':
-        dismiss_status = dismiss_job(procID, jobID)
+        dismiss_status = ades_base.dismiss_job(procID, jobID)
         resp_dict = {"statusInfo": dismiss_status}
     return resp_dict, status_code, {'ContentType':'application/json'}
     
 @app.route("/processes/<procID>/jobs/<jobID>/result", methods = ['GET'])
 def processes_result(procID, jobID):
     status_code = 200
-    resp_dict = get_job_results(procID, jobID)
+    ades_base = ADES_Base(app.config)
+    resp_dict = ades_base.get_job_results(procID, jobID)
     return resp_dict, status_code, {'ContentType':'application/json'}
 
-def flask_wpst(app, debug=False, host="127.0.0.1"):
+def flask_wpst(app, debug=False, host="127.0.0.1",
+               valid_platforms = ("Generic", "Argo", "PBS")):
+    platform = os.environ.get("ADES_PLATFORM", default="Generic")
+    if platform not in valid_platforms:
+        raise ValueError("ADES_PLATFORM invalid - {} not in {}.".\
+                         format(platform, valid_platforms))
+    app.config["PLATFORM"] = platform
     app.run(debug=debug, host=host)
     
 
 if __name__ == "__main__":
+    print ("starting")
     host = parse_args()
     flask_wpst(app, debug=True, host=host)
