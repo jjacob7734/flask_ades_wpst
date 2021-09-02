@@ -13,10 +13,8 @@ class ADES_Base:
             from flask_ades_wpst.ades_generic import ADES_Generic as ADES_Platform
         elif self._platform == "Argo":
             from flask_ades_wpst.ades_argo import ADES_Argo as ADES_Platform
-            self._ades = ADES_Argo()
         elif self._platform == "PBS":
             from flask_ades_wpst.ades_argo import ADES_PBS as ADES_Platform
-            self._ades = ADES_Argo()
         else:
             # Invalid platform setting.  If you do implement a new
             # platform here, you must also add it to the valid_platforms
