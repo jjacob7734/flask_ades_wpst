@@ -22,11 +22,11 @@ To run as a Docker container, but sure to map the Flask application server
 port to the host port (`-p` option) and mount your `sqlite` subdirectory on the
 host machine in to the container (`-v` option) as shown below.
 
-    docker run -it -p 5000:5000 -v ${PWD}/sqlite:/flask_ades_wpst/sqlite jjacob7734/flask_ades_wpst:latest
+    docker run -it -p 5000:5000 -v ${PWD}/sqlite:/flask_ades_wpst/sqlite jjacob7734/flask-ades-wpst:latest
 
 # Build the container locally
 
-    docker build -t flask_ades_wpst:latest -f docker/Dockerfile .
+    docker build -t flask-ades-wpst:latest -f docker/Dockerfile .
     
 # Try out the OGC ADES/WPS-T endpoints
 You can see the available endpoints by starting with the root endpoint and inspecting the links returned:
