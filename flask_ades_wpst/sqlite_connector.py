@@ -2,7 +2,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-db_name = "soamc_ades.db"
+db_name = "./sqlite/soamc_ades.db"
 
 def create_connection(db_file):
     """ create a database connection to the SQLite database
