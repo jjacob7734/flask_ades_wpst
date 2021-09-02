@@ -40,6 +40,7 @@ Run with Docker:
     docker run -it -p 5000:5000 -v ${PWD}/sqlite:/flask_ades_wpst/sqlite jjacob7734/flask-ades-wpst:latest
 
 # Build the container locally
+Be sure to follow the steps in the "Get started" section above first.
 If you run the Docker container as shown above, you will automatically download
 the latest container version from Docker Hub.  If you like, you can also build
 your own local container as follows:
