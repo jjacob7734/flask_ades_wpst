@@ -35,7 +35,7 @@ command as shown in the example below:
 is set, the default is `Generic`, which results in no additional actions
 being done on the host.
 
-Run with Docker: 
+# Run with Docker: 
 
 In the following, set the `ADES_PLATFORM` environment variable to the
 appropriate setting for your platform (examples: Argo, PBS)
