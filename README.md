@@ -37,7 +37,10 @@ being done on the host.
 
 Run with Docker: 
 
-    docker run -it -p 5000:5000 -v ${PWD}/sqlite:/flask_ades_wpst/sqlite jjacob7734/flask-ades-wpst:latest
+In the following, set the `ADES_PLATFORM` environment variable to the
+appropriate setting for your platform (examples: Argo, PBS)
+
+    docker run -it -p 5000:5000 -v ${PWD}/sqlite:/flask_ades_wpst/sqlite -e "ADES_PLATFORM=<platform>" <org>/flask-ades-wpst:<tag>
 
 # Build the container locally
 Be sure to follow the steps in the "Get started" section above first.
@@ -45,7 +48,7 @@ If you run the Docker container as shown above, you will automatically download
 the latest container version from Docker Hub.  If you like, you can also build
 your own local container as follows:
 
-    docker build -t flask-ades-wpst:<tag> -f docker/Dockerfile .
+    docker build -t <org>/flask-ades-wpst:<tag> -f docker/Dockerfile .
     
 # Try out the OGC ADES/WPS-T endpoints
 You can see the available endpoints by starting with the root endpoint and inspecting the links returned:
