@@ -1,5 +1,6 @@
 import sys
 import requests
+import json
 import hashlib
 from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_get_proc, sqlite_deploy_proc, sqlite_undeploy_proc, sqlite_get_jobs, sqlite_get_job, sqlite_exec_job, sqlite_dismiss_job
 from datetime import datetime
@@ -11,8 +12,8 @@ class ADES_Base:
         self._platform = app_config["PLATFORM"]
         if self._platform == "Generic":
             from flask_ades_wpst.ades_generic import ADES_Generic as ADES_Platform
-        elif self._platform == "Argo":
-            from flask_ades_wpst.ades_argo import ADES_Argo as ADES_Platform
+        elif self._platform == "K8s":
+            from flask_ades_wpst.ades_k8s import ADES_K8s as ADES_Platform
         elif self._platform == "PBS":
             from flask_ades_wpst.ades_pbs import ADES_PBS as ADES_Platform
         else:
@@ -49,6 +50,15 @@ class ADES_Base:
         response = requests.get(proc_desc_url)
         if response.status_code == 200:
             proc_spec = response.json()
+
+            # generate proc_id
+            proc_desc = proc_spec["processDescription"]
+            proc_desc2 = proc_desc["process"]
+            proc_id = f"{proc_desc2['id']}-{proc_desc['processVersion']}"
+
+            # overwrite the process ID
+            proc_desc2["id"] = proc_id
+
             sqlite_deploy_proc(proc_spec)
             ades_resp = self._ades.deploy_proc(proc_spec)
         return proc_spec
@@ -76,15 +86,18 @@ class ADES_Base:
         job_info = {"jobID": job_id, "status": ades_resp["status"]}
         return job_info
 
-    def exec_job(self, job_desc_url):
+    def exec_job(self, proc_id, job_inputs):
         now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
-        response =requests.get(job_desc_url)
-        if response.status_code == 200:
-            job_spec = response.json()
-            job_id = hashlib.sha1((response.text + now).encode()).hexdigest()
-            sqlite_exec_job(job_id, job_spec)
-            ades_resp = self._ades.exec_job(job_spec)
-        return job_spec
+        # TODO: this needs to be globally unique despite underlying processing cluster
+        job_id = f"{proc_id}-{hashlib.sha1((json.dumps(job_inputs, sort_keys=True) + now).encode()).hexdigest()}"
+        job_spec = {
+            "process": self.get_proc(proc_id),
+            "inputs": job_inputs,
+            "job_id": job_id,
+        }
+        sqlite_exec_job(proc_id, job_id, job_inputs)
+        ades_resp = self._ades.exec_job(job_spec)
+        return {"jobID": job_id, "status": ades_resp["status"]}
             
     def dismiss_job(self, proc_id, job_id):
         job_spec = sqlite_dismiss_job(job_id)

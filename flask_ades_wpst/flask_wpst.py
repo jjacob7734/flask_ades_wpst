@@ -49,6 +49,7 @@ def processes():
         req_vals = request.values
         proc_info = ades_base.deploy_proc(req_vals["proc"])
         resp_dict = {"deploymentResult": {"processSummary": proc_info}}
+        status_code = 201
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 @app.route("/processes/<procID>", methods = ['GET', 'DELETE'])
@@ -71,8 +72,8 @@ def processes_jobs(procID):
         resp_dict = {"jobs": job_list}
     elif request.method == 'POST':
         status_code = 201
-        req_vals = request.values
-        job_info = ades_base.exec_job(req_vals["job"])
+        job_params = request.get_json()
+        job_info = ades_base.exec_job(procID, job_params)
         resp_dict = job_info
     return resp_dict, status_code, {'ContentType':'application/json'}
 
@@ -95,7 +96,7 @@ def processes_result(procID, jobID):
     return resp_dict, status_code, {'ContentType':'application/json'}
 
 def flask_wpst(app, debug=False, host="127.0.0.1",
-               valid_platforms = ("Generic", "Argo", "PBS")):
+               valid_platforms = ("Generic", "K8s", "PBS")):
     platform = os.environ.get("ADES_PLATFORM", default="Generic")
     if platform not in valid_platforms:
         raise ValueError("ADES_PLATFORM invalid - {} not in {}.".\

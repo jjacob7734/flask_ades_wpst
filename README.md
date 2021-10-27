@@ -31,14 +31,14 @@ command as shown in the example below:
 1. Mount your `sqlite` subdirectory on the host machine in to the container
 (`-v` option)
 1. Set the `ADES_PLATFORM` environment variable to a supported environment
-(e.g., `Argo`, `PBS`, `Generic`) (`-v` option).  If no environment variable
+(e.g., `K8s`, `PBS`, `Generic`) (`-v` option).  If no environment variable
 is set, the default is `Generic`, which results in no additional actions
 being done on the host.
 
 # Run with Docker: 
 
 In the following, set the `ADES_PLATFORM` environment variable to the
-appropriate setting for your platform (examples: Argo, PBS)
+appropriate setting for your platform (examples: K8s, PBS)
 
     docker run -it -p 5000:5000 -v ${PWD}/sqlite:/flask_ades_wpst/sqlite -e "ADES_PLATFORM=<platform>" <org>/flask-ades-wpst:<tag>
 

@@ -1,5 +1,7 @@
 import os
 import sqlite3
+import requests
+import yaml
 from datetime import datetime
 
 db_name = "./sqlite/soamc_ades.db"
@@ -51,8 +53,8 @@ def sqlite_db(func):
                                         );"""
             sql_create_jobs_table = """CREATE TABLE IF NOT EXISTS jobs (
                                          jobID TEXT PRIMARY KEY,
+                                         procID TEXT,
                                          inputs BLOB,
-                                         outputs BLOB,
                                          status TEXT,
                                          timestamp TEXT
                                        );"""
@@ -144,13 +146,13 @@ def sqlite_get_job(job_id):
     return job_dict
 
 @sqlite_db
-def sqlite_exec_job(job_id, job_spec):
+def sqlite_exec_job(proc_id, job_id, job_spec):
     conn = create_connection(db_name)
     cur = conn.cursor()
-    sql_str = """INSERT INTO jobs(jobID, inputs, outputs, status, timestamp)
+    sql_str = """INSERT INTO jobs(jobID, procID, inputs, status, timestamp)
                  VALUES(\"{}\", \"{}\", \"{}\", \"{}\", \"{}\");""".\
-                 format(job_id, job_spec["inputs"], job_spec["outputs"],
-                        "accepted", datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
+                 format(job_id, proc_id, job_spec, "accepted",
+                        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
     cur.execute(sql_str)
     conn.commit()
     return sqlite_get_job(job_id)
