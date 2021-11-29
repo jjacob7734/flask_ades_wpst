@@ -68,7 +68,7 @@ def processes_jobs(procID):
     ades_base = ADES_Base(app.config)
     if request.method == 'GET':
         status_code = 200
-        job_list = ades_base.get_jobs()
+        job_list = ades_base.get_jobs(procID)
         resp_dict = {"jobs": job_list}
     elif request.method == 'POST':
         status_code = 201

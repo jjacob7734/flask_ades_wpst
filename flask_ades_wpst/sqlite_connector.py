@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import requests
 import yaml
@@ -54,7 +55,8 @@ def sqlite_db(func):
             sql_create_jobs_table = """CREATE TABLE IF NOT EXISTS jobs (
                                          jobID TEXT PRIMARY KEY,
                                          procID TEXT,
-                                         inputs BLOB,
+                                         inputs DATA,
+                                         backend_info DATA,
                                          status TEXT,
                                          timestamp TEXT
                                        );"""
@@ -124,10 +126,12 @@ def sqlite_get_headers(cur, tname):
     return col_headers
 
 @sqlite_db
-def sqlite_get_jobs():
+def sqlite_get_jobs(proc_id=None):
     conn = create_connection(db_name)
     cur = conn.cursor()
     sql_str = "SELECT * FROM jobs"
+    if proc_id is not None:
+        sql_str += """ WHERE procID = \"{}\"""".format(proc_id)
     cur.execute(sql_str)
     job_list = cur.fetchall()
     col_headers = sqlite_get_headers(cur, "jobs")
@@ -142,18 +146,23 @@ def sqlite_get_job(job_id):
                  WHERE jobID = \"{}\"""".format(job_id)
     job = cur.execute(sql_str).fetchall()[0]
     col_headers = sqlite_get_headers(cur, "jobs")
-    job_dict = dict(zip(col_headers, job))
+    job_dict = {}
+    for i, col in enumerate(col_headers):
+        # deserialize JSON data fields
+        if col in ("inputs", "backend_info"):
+            job_dict[col] = json.loads(job[i])
+        else:
+            job_dict[col] = job[i]
     return job_dict
 
 @sqlite_db
-def sqlite_exec_job(proc_id, job_id, job_spec):
+def sqlite_exec_job(proc_id, job_id, job_spec, backend_info):
     conn = create_connection(db_name)
     cur = conn.cursor()
-    sql_str = """INSERT INTO jobs(jobID, procID, inputs, status, timestamp)
-                 VALUES(\"{}\", \"{}\", \"{}\", \"{}\", \"{}\");""".\
-                 format(job_id, proc_id, job_spec, "accepted",
-                        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
-    cur.execute(sql_str)
+    cur.execute("""INSERT INTO jobs(jobID, procID, inputs, backend_info, status, timestamp)
+                VALUES(?, ?, ?, ?, ?, ?)""", [
+                    job_id, proc_id, json.dumps(job_spec), json.dumps(backend_info),
+                    "accepted", datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")])
     conn.commit()
     return sqlite_get_job(job_id)
 

@@ -17,6 +17,7 @@ setup(
     install_requires=[
         "Flask==1.1.2",
         "requests==2.24.0",
-        "pyyaml==5.4.1"
+        "pyyaml==5.4.1",
+        "kubernetes==19.15.0"
     ]
 )

@@ -68,8 +68,8 @@ class ADES_Base:
         ades_resp = self._ades.undeploy_proc(proc_desc)
         return self.proc_dict(proc_desc)
 
-    def get_jobs(self):
-        jobs = sqlite_get_jobs()
+    def get_jobs(self, proc_id=None):
+        jobs = sqlite_get_jobs(proc_id)
         return jobs
 
     def get_job(self, proc_id, job_id):
@@ -95,8 +95,10 @@ class ADES_Base:
             "inputs": job_inputs,
             "job_id": job_id,
         }
-        sqlite_exec_job(proc_id, job_id, job_inputs)
         ades_resp = self._ades.exec_job(job_spec)
+        # ades_resp will return platform specific information that should be 
+        # kept in the database with the job ID record
+        sqlite_exec_job(proc_id, job_id, job_inputs, ades_resp)
         return {"jobID": job_id, "status": ades_resp["status"]}
             
     def dismiss_job(self, proc_id, job_id):
