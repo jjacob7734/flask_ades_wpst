@@ -308,6 +308,20 @@ class ADES_K8s(ADES_ABC):
         }
 
     def dismiss_job(self, job_spec):
+        # get job id
+        k8s_job_id = job_spec["backend_info"]["k8s_job_id"]
+
+        # get job status
+        status = self.get_job(job_spec)["status"]
+        if status not in ("running", "accepted"):
+            raise RuntimeError(f"Cannot dismiss job {k8s_job_id} with status {status}.")
+
+        # delete the job
+        batch_api = client.BatchV1Api()
+        api_response = batch_api.delete_namespaced_job(
+            name=k8s_job_id, namespace=self.ns, pretty=True
+        ) 
+        print(api_response.status)
         return job_spec
 
     def get_job(self, job_spec):

@@ -167,17 +167,20 @@ def sqlite_exec_job(proc_id, job_id, job_spec, backend_info):
     return sqlite_get_job(job_id)
 
 @sqlite_db
-def sqlite_dismiss_job(job_id):
+def sqlite_update_job_status(job_id, status):
     conn = create_connection(db_name)
     cur = conn.cursor()
     sql_str = """UPDATE jobs
                  SET status = \"{}\",
                      timestamp = \"{}\"
                  WHERE jobID = \"{}\"""".\
-                 format("dismissed",
+                 format(status,
                         datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                         job_id)
     cur.execute(sql_str)
     conn.commit()
     return sqlite_get_job(job_id)
 
+@sqlite_db
+def sqlite_dismiss_job(job_id):
+    return sqlite_update_job_status(job_id, "dismissed")

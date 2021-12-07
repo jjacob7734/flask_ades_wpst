@@ -2,7 +2,7 @@ import sys
 import requests
 import json
 import hashlib
-from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_get_proc, sqlite_deploy_proc, sqlite_undeploy_proc, sqlite_get_jobs, sqlite_get_job, sqlite_exec_job, sqlite_dismiss_job
+from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_get_proc, sqlite_deploy_proc, sqlite_undeploy_proc, sqlite_get_jobs, sqlite_get_job, sqlite_exec_job, sqlite_dismiss_job, sqlite_update_job_status
 from datetime import datetime
 
 class ADES_Base:
@@ -82,8 +82,19 @@ class ADES_Base:
         #   nextPoll (dateTime)
         #   percentCompleted (int) in range [0, 100]
         job_spec = sqlite_get_job(job_id)
+
+        # if job was dismissed, then bypass querying the ADES backend
+        job_info = {"jobID": job_id, "status": job_spec["status"]}
+        if job_spec["status"] == "dismissed":
+            return job_info
+
+        # otherwise, query the ADES backend for the current status
         ades_resp = self._ades.get_job(job_spec)
-        job_info = {"jobID": job_id, "status": ades_resp["status"]}
+        #print(ades_resp)
+        job_info["status"] = ades_resp["status"]
+
+        # and update the db with that status
+        sqlite_update_job_status(job_id, job_info["status"])
         return job_info
 
     def exec_job(self, proc_id, job_inputs):
