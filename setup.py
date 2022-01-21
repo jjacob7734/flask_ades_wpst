@@ -15,9 +15,11 @@ setup(
         "Container": "https://hub.docker.com/r/jjacob7734/flask-ades-wpst"
     },
     install_requires=[
-        "Flask==1.1.2",
-        "requests==2.24.0",
+        "Flask==2.0.2",
+        "requests==2.26.0",
         "pyyaml==5.4.1",
-        "kubernetes==19.15.0"
+        "kubernetes==19.15.0",
+        "cwltool==3.1.20211107152837",
+        "cwl-runner==1.0"
     ]
 )
