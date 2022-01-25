@@ -1,8 +1,10 @@
 import os
 import json
+import yaml
 import base64
 import string
 import random
+import requests
 from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
 from kubernetes.client.models.v1_object_meta import V1ObjectMeta
@@ -12,6 +14,10 @@ from flask_ades_wpst.ades_abc import ADES_ABC
 class ADES_K8s(ADES_ABC):
     def __init__(self):
         print(f"in ADES_K8s.__init__()")
+
+        # detect if debugging K8s
+        self.debug_k8s = os.environ.get("DEBUG_K8S", "false").lower() == "true"
+        print(f"self.debug_k8s: {self.debug_k8s}")
 
         # detect using NFS for PersistentVolumes
         self.use_nfs = os.environ.get("USE_NFS", None)
@@ -145,6 +151,22 @@ class ADES_K8s(ADES_ABC):
     def exec_job(self, job_spec):
         print(f"in ADES_K8s.exec_job(): job_spec={json.dumps(job_spec, indent=2)}")
 
+        # default resource specs
+        resource_req_defaults = {
+            "coresMin": 1,
+            "ramMin": 1024,
+            "tmpdirMin": 1000,
+            "outdirMin": 1000
+        }
+
+        # get cwl
+        r = requests.get(job_spec["process"]["owsContextURL"], verify=False)
+        r.raise_for_status()
+        cwl = yaml.safe_load(r.text)
+        resource_req = {**resource_req_defaults, 
+                        **(cwl.get("requirements", {}).get("ResourceRequirement", {}))}
+        print(f"in ADES_K8s.exec_job(): ResourceRequirement={json.dumps(resource_req, indent=2)}")
+
         # generate unique ID that conforms to K8s requirements (<63 alphanumeric chars, -, _)
         id = self.id_generator()
 
@@ -163,7 +185,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=input_pv_name),
                 spec={
                     "accessModes": ["ReadWriteOnce", "ReadOnlyMany"],
-                    "capacity": {"storage": "1Gi"},
+                    "capacity": {"storage": f"{resource_req['tmpdirMin']}Mi"},
                     "nfs": {"server": self.use_nfs,
                             "path": "/"},
                 },
@@ -175,7 +197,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=input_pvc_name),
                 spec={
                     "accessModes": ["ReadWriteOnce", "ReadOnlyMany"],
-                    "resources": {"requests": {"storage": "1Gi"}},
+                    "resources": {"requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}},
                     "volumeName": input_pv_name,
                     "storageClassName": "",
                 },
@@ -185,7 +207,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=input_pvc_name),
                 spec={
                     "accessModes": ["ReadWriteOnce", "ReadOnlyMany"],
-                    "resources": {"requests": {"storage": "1Gi"}},
+                    "resources": {"requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}},
                 },
             )
         self.core_client.create_namespaced_persistent_volume_claim(
@@ -200,7 +222,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=tmpout_pv_name),
                 spec={
                     "accessModes": ["ReadOnlyMany"],
-                    "capacity": {"storage": "1Gi"},
+                    "capacity": {"storage": f"{resource_req['tmpdirMin']}Mi"},
                     "nfs": {"server": self.use_nfs,
                             "path": "/"},
                 },
@@ -212,7 +234,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=tmpout_pvc_name),
                 spec={
                     "accessModes": ["ReadOnlyMany"],
-                    "resources": {"requests": {"storage": "1Gi"}},
+                    "resources": {"requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}},
                     "volumeName": tmpout_pv_name,
                     "storageClassName": "",
                 },
@@ -222,7 +244,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=tmpout_pvc_name),
                 spec={
                     "accessModes": ["ReadWriteMany"],
-                    "resources": {"requests": {"storage": "1Gi"}},
+                    "resources": {"requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}},
                 },
             )
         self.core_client.create_namespaced_persistent_volume_claim(
@@ -237,7 +259,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=output_pv_name),
                 spec={
                     "accessModes": ["ReadOnlyMany"],
-                    "capacity": {"storage": "1Gi"},
+                    "capacity": {"storage": f"{resource_req['outdirMin']}Mi"},
                     "nfs": {"server": self.use_nfs,
                             "path": "/"},
                 },
@@ -249,7 +271,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=output_pvc_name),
                 spec={
                     "accessModes": ["ReadOnlyMany"],
-                    "resources": {"requests": {"storage": "1Gi"}},
+                    "resources": {"requests": {"storage": f"{resource_req['outdirMin']}Mi"}},
                     "volumeName": output_pv_name,
                     "storageClassName": "",
                 },
@@ -259,7 +281,7 @@ class ADES_K8s(ADES_ABC):
                 metadata=client.V1ObjectMeta(name=output_pvc_name),
                 spec={
                     "accessModes": ["ReadWriteMany"],
-                    "resources": {"requests": {"storage": "1Gi"}},
+                    "resources": {"requests": {"storage": f"{resource_req['outdirMin']}Mi"}},
                 },
             )
         self.core_client.create_namespaced_persistent_volume_claim(
@@ -282,10 +304,14 @@ class ADES_K8s(ADES_ABC):
                                 "/calrissian/output-data/docker-output.json",
                                 "--stderr",
                                 "/calrissian/output-data/docker-stderr.log",
-                                "--max-ram",
-                                "16G",
-                                "--max-cores",
-                                "8",
+                                # instead of specifying these options we are relying
+                                # on calrissian to submit hardware requirements for
+                                # each pod/processing step as specified in their
+                                # respective CWL
+                                #"--max-ram",
+                                #f"{resource_req['ramMin']}Mi",
+                                #"--max-cores",
+                                #f"{resource_req['coresMin']}",
                                 "--tmp-outdir-prefix",
                                 "/calrissian/tmpout/",
                                 "--outdir",
@@ -340,6 +366,14 @@ class ADES_K8s(ADES_ABC):
                 }
             }
         }
+
+        # if debug_k8s, don't retry K8S jobs and disable deletion of pods
+        if self.debug_k8s:
+            k8s_job_spec["backoffLimit"] = 0
+            k8s_job_spec["template"]["spec"]["containers"][0]["env"].append({
+                "name": "CALRISSIAN_DELETE_PODS",
+                "value": "false"
+            })
 
         # add initContainer to allow read-write NFS mounted volumes
         if self.use_nfs:
