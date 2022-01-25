@@ -304,14 +304,10 @@ class ADES_K8s(ADES_ABC):
                                 "/calrissian/output-data/docker-output.json",
                                 "--stderr",
                                 "/calrissian/output-data/docker-stderr.log",
-                                # instead of specifying these options we are relying
-                                # on calrissian to submit hardware requirements for
-                                # each pod/processing step as specified in their
-                                # respective CWL
-                                #"--max-ram",
-                                #f"{resource_req['ramMin']}Mi",
-                                #"--max-cores",
-                                #f"{resource_req['coresMin']}",
+                                "--max-ram",
+                                f"{resource_req['ramMin']}Mi",
+                                "--max-cores",
+                                f"{resource_req['coresMin']}",
                                 "--tmp-outdir-prefix",
                                 "/calrissian/tmpout/",
                                 "--outdir",
