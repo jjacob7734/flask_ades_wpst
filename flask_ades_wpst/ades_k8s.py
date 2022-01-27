@@ -371,35 +371,41 @@ class ADES_K8s(ADES_ABC):
                 "value": "false"
             })
 
-        # add initContainer to allow read-write NFS mounted volumes
-        if self.use_nfs:
-            k8s_job_spec["template"]["spec"]["initContainers"] = [{
-                "name": "init-nfs-volumes",
-                "image": "busybox",
-                "imagePullPolicy": "Always",
-                "command": ["chmod"],
-                "args": [
-                    "-R",
-                    "+t",
-                    "/calrissian"
-                ],
-                "volumeMounts": [
-                    {
-                        "mountPath": "/calrissian/input-data",
-                        "name": input_pvc_name,
-                    },
-                    {
-                        "mountPath": "/calrissian/tmpout",
-                        "name": tmpout_pvc_name,
-                    },
-                    {
-                        "mountPath": "/calrissian/output-data",
-                        "name": output_pvc_name,
-                    },
-                ]
-            }]
+        # add initContainer to prep up tmpout and output-data directories
+        k8s_job_spec["template"]["spec"]["initContainers"] = [{
+            "name": "init-volumes",
+            "image": "busybox",
+            "imagePullPolicy": "Always",
+            "command": ["sh"],
+            "args": [
+                "-c",
+                "chmod 777 /calrissian || true && " +
+                "chmod +t /calrissian || true && " +
+                f"mkdir -p /calrissian/tmpout/{tmpout_pvc_name} && " +
+                f"chmod 777 /calrissian/tmpout/{tmpout_pvc_name} && " +
+                f"chmod +t /calrissian/tmpout/{tmpout_pvc_name} && " +
+                f"mkdir -p /calrissian/output-data/{output_pvc_name} && " +
+                f"chmod 777 /calrissian/output-data/{output_pvc_name} && " +
+                f"chmod +t /calrissian/output-data/{output_pvc_name}"
+            ],
+            "volumeMounts": [
+                {
+                    "mountPath": "/calrissian/input-data",
+                    "name": input_pvc_name,
+                },
+                {
+                    "mountPath": "/calrissian/tmpout",
+                    "name": tmpout_pvc_name,
+                },
+                {
+                    "mountPath": "/calrissian/output-data",
+                    "name": output_pvc_name,
+                },
+            ]
+        }]
 
-            # remove readOnly specs
+        # remove readOnly specs if using NFS
+        if self.use_nfs:
             del k8s_job_spec["template"]["spec"]["containers"][0]["volumeMounts"][0]["readOnly"]
             del k8s_job_spec["template"]["spec"]["volumes"][0]["persistentVolumeClaim"]["readOnly"]
 
