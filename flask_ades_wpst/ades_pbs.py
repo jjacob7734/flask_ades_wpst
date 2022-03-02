@@ -17,9 +17,9 @@ class ADES_PBS(ADES_ABC):
                  pbs_script_stub = """#!/bin/bash
 #
 #PBS -q debug
-#PBS -lselect=1:ncpus=1:model=has:aoe=sles12
+#PBS -lselect=1:ncpus=1:model=bro
 #PBS -lwalltime=2:00:00
-#PBS -lsite=nat=hfe1
+#PBS -lsite=static_broadwell:nat=hfe1
 #
 # Setup
 module load singularity
