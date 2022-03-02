@@ -119,8 +119,9 @@ echo {{\\"exit_code\\": $?}} > {}
     def undeploy_proc(self, proc_spec):
         container = proc_spec["executionUnit"]
         local_sif = self._construct_sif_name(container)
-        print("Removing local SIF {}".format(local_sif))
-        os.remove(local_sif)
+        if os.path.exists(local_sif):
+            print("Removing local SIF {}".format(local_sif))
+            os.remove(local_sif)
         return proc_spec
 
     def exec_job(self, job_spec):
