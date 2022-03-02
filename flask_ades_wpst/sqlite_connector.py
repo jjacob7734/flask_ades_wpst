@@ -80,7 +80,15 @@ def sqlite_get_proc(proc_id):
     sql_str = """SELECT * FROM processes
                  WHERE id = \"{}\"""".format(proc_id)
     cur.execute(sql_str)
-    return cur.fetchall()[0]
+    res = cur.fetchall()
+    num_matches = len(res)
+    if num_matches == 1:
+        res = res[0]
+    else:
+        assert(num_matches == 0, 
+               "Found more than one match for {}. This should never happen.".
+               format(proc_id))
+    return res
 
 @sqlite_db
 def sqlite_deploy_proc(proc_spec):
@@ -111,12 +119,13 @@ def sqlite_deploy_proc(proc_spec):
 @sqlite_db
 def sqlite_undeploy_proc(proc_id):
     proc_desc = sqlite_get_proc(proc_id)
-    conn = create_connection(db_name)
-    cur = conn.cursor()
-    sql_str = """DELETE FROM processes
-                 WHERE id = \"{}\"""".format(proc_id)
-    cur.execute(sql_str)
-    conn.commit()
+    if proc_desc:
+        conn = create_connection(db_name)
+        cur = conn.cursor()
+        sql_str = """DELETE FROM processes
+                     WHERE id = \"{}\"""".format(proc_id)
+        cur.execute(sql_str)
+        conn.commit()
     return proc_desc
 
 def sqlite_get_headers(cur, tname):
