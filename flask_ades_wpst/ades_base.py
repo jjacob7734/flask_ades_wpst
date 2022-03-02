@@ -64,9 +64,11 @@ class ADES_Base:
         return proc_spec
             
     def undeploy_proc(self, proc_id):
-        proc_desc = self.proc_dict(sqlite_undeploy_proc(proc_id))
-        print("proc_desc: ", proc_desc)
-        ades_resp = self._ades.undeploy_proc(proc_desc)
+        proc_desc = sqlite_undeploy_proc(proc_id)
+        if proc_desc:
+            proc_desc = self.proc_dict(proc_desc)
+            print("proc_desc: ", proc_desc)
+            ades_resp = self._ades.undeploy_proc(proc_desc)
         return proc_desc
 
     def get_jobs(self, proc_id=None):
