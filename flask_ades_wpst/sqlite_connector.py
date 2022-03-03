@@ -153,15 +153,24 @@ def sqlite_get_job(job_id):
     cur = conn.cursor()
     sql_str = """SELECT * FROM jobs
                  WHERE jobID = \"{}\"""".format(job_id)
-    job = cur.execute(sql_str).fetchall()[0]
-    col_headers = sqlite_get_headers(cur, "jobs")
-    job_dict = {}
-    for i, col in enumerate(col_headers):
-        # deserialize JSON data fields
-        if col in ("inputs", "backend_info"):
-            job_dict[col] = json.loads(job[i])
-        else:
-            job_dict[col] = job[i]
+    job_matches = cur.execute(sql_str).fetchall()
+    num_matches = len(job_matches)
+    if num_matches == 0:
+        job_dict = {}
+    elif num_matches == 1:
+        job = job_matches[0]
+        col_headers = sqlite_get_headers(cur, "jobs")
+        job_dict = {}
+        for i, col in enumerate(col_headers):
+            # deserialize JSON data fields
+            if col in ("inputs", "backend_info"):
+                job_dict[col] = json.loads(job[i])
+            else:
+                job_dict[col] = job[i]
+    else:
+        # This should never happen.
+        raise ValueError("Found more than one match for job ID {}".
+                         format(job_id))
     return job_dict
 
 @sqlite_db
@@ -192,4 +201,9 @@ def sqlite_update_job_status(job_id, status):
 
 @sqlite_db
 def sqlite_dismiss_job(job_id):
-    return sqlite_update_job_status(job_id, "dismissed")
+    job_dict = sqlite_get_job(job_id)
+    if job_dict:
+        resp = sqlite_update_job_status(job_id, "dismissed")
+    else:
+        resp = {}
+    return resp

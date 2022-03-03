@@ -117,7 +117,8 @@ class ADES_Base:
             
     def dismiss_job(self, proc_id, job_id):
         job_spec = sqlite_dismiss_job(job_id)
-        ades_resp = self._ades.dismiss_job(job_spec)
+        if job_spec:
+            ades_resp = self._ades.dismiss_job(job_spec)
         return job_spec
 
     def get_job_results(self, proc_id, job_id):
