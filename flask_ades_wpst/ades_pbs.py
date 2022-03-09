@@ -27,7 +27,7 @@ module load singularity
 cd {}
 #
 # Run workflow
-cwl-runner --singularity --no-match-user --no-read-only {} {}
+cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir {} {}
 echo {{\\"exit_code\\": $?}} > {}
 """):
         self._base_work_dir = base_work_dir
@@ -145,8 +145,13 @@ echo {{\\"exit_code\\": $?}} > {}
         # Create PBS script in the work directory.
         pbs_script_fname = os.path.join(work_dir, self._pbs_script_fname)
         with open(pbs_script_fname, 'w') as pbs_script_file:
+            # The second format string below is the cwl-runner's tmpdir-prefix,
+            # which we set to the same as the work directory.  The os.path.join
+            # with '' is a trick to ensure that the trailing slash is included
+            # in the path.
             pbs_script_file.write(self._pbs_script_stub.\
-                                  format(work_dir,
+                                  format(work_dir, 
+                                         os.path.join(work_dir, ''),
                                          job_spec['process']['owsContextURL'],
                                          job_inputs_fname, 
                                          self._exit_code_fname))
