@@ -16,9 +16,9 @@ class ADES_PBS(ADES_ABC):
                  exit_code_fname = "exit_code.json", 
                  pbs_script_stub = """#!/bin/bash
 #
-#PBS -q debug
+#PBS -q long
 #PBS -lselect=1:ncpus=1:model=bro
-#PBS -lwalltime=2:00:00
+#PBS -lwalltime=120:00:00
 #PBS -lsite=static_broadwell:nat=hfe1
 #
 # Setup
