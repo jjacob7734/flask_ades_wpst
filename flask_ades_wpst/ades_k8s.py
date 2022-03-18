@@ -23,7 +23,7 @@ class ADES_K8s(ADES_ABC):
         print(f"self.ns: {self.ns}")
 
         # detect storage class
-        self.sc_name = os.environ.get("STORAGE_CLASS_NAME", "")
+        self.sc_name = os.environ.get("STORAGE_CLASS", "")
         print(f"self.sc_name: {self.sc_name}")
 
         # detect using NFS for PersistentVolumes
