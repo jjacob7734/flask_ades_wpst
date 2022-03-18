@@ -22,9 +22,11 @@ class ADES_K8s(ADES_ABC):
         self.ns = os.environ.get("NAMESPACE", "ades").lower()
         print(f"self.ns: {self.ns}")
 
-        # detect using NFS for PersistentVolumes;
-        # if the string 'efs' exists in the value,
-        # we assume it is the storageClassName
+        # detect storage class
+        self.sc_name = os.environ.get("STORAGE_CLASS_NAME", "")
+        print(f"self.sc_name: {self.sc_name}")
+
+        # detect using NFS for PersistentVolumes
         self.use_nfs = os.environ.get("USE_NFS", None)
         print(f"self.use_nfs: {self.use_nfs}")
 
@@ -188,39 +190,27 @@ class ADES_K8s(ADES_ABC):
         # create PVC for tmpout
         tmpout_pvc_name = f"tmpout-{id}"
         if self.use_nfs:
-            if "efs" in self.use_nfs:
-                body = client.V1PersistentVolumeClaim(
-                    metadata=client.V1ObjectMeta(name=tmpout_pvc_name),
-                    spec={
-                        "accessModes": ["ReadWriteMany"],
-                        "resources": {
-                            "requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}
-                        },
-                        "storageClassName": self.use_nfs,
+            tmpout_pv_name = f"{tmpout_pvc_name}-pv"
+            body = client.V1PersistentVolume(
+                metadata=client.V1ObjectMeta(name=tmpout_pv_name),
+                spec={
+                    "accessModes": ["ReadOnlyMany"],
+                    "capacity": {"storage": f"{resource_req['tmpdirMin']}Mi"},
+                    "nfs": {"server": self.use_nfs, "path": "/"},
+                },
+            )
+            self.core_client.create_persistent_volume(body=body)
+            body = client.V1PersistentVolumeClaim(
+                metadata=client.V1ObjectMeta(name=tmpout_pvc_name),
+                spec={
+                    "accessModes": ["ReadOnlyMany"],
+                    "resources": {
+                        "requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}
                     },
-                )
-            else:
-                tmpout_pv_name = f"{tmpout_pvc_name}-pv"
-                body = client.V1PersistentVolume(
-                    metadata=client.V1ObjectMeta(name=tmpout_pv_name),
-                    spec={
-                        "accessModes": ["ReadOnlyMany"],
-                        "capacity": {"storage": f"{resource_req['tmpdirMin']}Mi"},
-                        "nfs": {"server": self.use_nfs, "path": "/"},
-                    },
-                )
-                self.core_client.create_persistent_volume(body=body)
-                body = client.V1PersistentVolumeClaim(
-                    metadata=client.V1ObjectMeta(name=tmpout_pvc_name),
-                    spec={
-                        "accessModes": ["ReadOnlyMany"],
-                        "resources": {
-                            "requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}
-                        },
-                        "volumeName": tmpout_pv_name,
-                        "storageClassName": "",
-                    },
-                )
+                    "volumeName": tmpout_pv_name,
+                    "storageClassName": self.sc_name,
+                },
+            )
         else:
             body = client.V1PersistentVolumeClaim(
                 metadata=client.V1ObjectMeta(name=tmpout_pvc_name),
@@ -229,6 +219,7 @@ class ADES_K8s(ADES_ABC):
                     "resources": {
                         "requests": {"storage": f"{resource_req['tmpdirMin']}Mi"}
                     },
+                    "storageClassName": self.sc_name,
                 },
             )
         self.core_client.create_namespaced_persistent_volume_claim(
@@ -238,39 +229,27 @@ class ADES_K8s(ADES_ABC):
         # create PVC for output data
         output_pvc_name = f"output-data-{id}"
         if self.use_nfs:
-            if "efs" in self.use_nfs:
-                body = client.V1PersistentVolumeClaim(
-                    metadata=client.V1ObjectMeta(name=output_pvc_name),
-                    spec={
-                        "accessModes": ["ReadWriteMany"],
-                        "resources": {
-                            "requests": {"storage": f"{resource_req['outdirMin']}Mi"}
-                        },
-                        "storageClassName": self.use_nfs,
+            output_pv_name = f"{output_pvc_name}-pv"
+            body = client.V1PersistentVolume(
+                metadata=client.V1ObjectMeta(name=output_pv_name),
+                spec={
+                    "accessModes": ["ReadOnlyMany"],
+                    "capacity": {"storage": f"{resource_req['outdirMin']}Mi"},
+                    "nfs": {"server": self.use_nfs, "path": "/"},
+                },
+            )
+            self.core_client.create_persistent_volume(body=body)
+            body = client.V1PersistentVolumeClaim(
+                metadata=client.V1ObjectMeta(name=output_pvc_name),
+                spec={
+                    "accessModes": ["ReadOnlyMany"],
+                    "resources": {
+                        "requests": {"storage": f"{resource_req['outdirMin']}Mi"}
                     },
-                )
-            else:
-                output_pv_name = f"{output_pvc_name}-pv"
-                body = client.V1PersistentVolume(
-                    metadata=client.V1ObjectMeta(name=output_pv_name),
-                    spec={
-                        "accessModes": ["ReadOnlyMany"],
-                        "capacity": {"storage": f"{resource_req['outdirMin']}Mi"},
-                        "nfs": {"server": self.use_nfs, "path": "/"},
-                    },
-                )
-                self.core_client.create_persistent_volume(body=body)
-                body = client.V1PersistentVolumeClaim(
-                    metadata=client.V1ObjectMeta(name=output_pvc_name),
-                    spec={
-                        "accessModes": ["ReadOnlyMany"],
-                        "resources": {
-                            "requests": {"storage": f"{resource_req['outdirMin']}Mi"}
-                        },
-                        "volumeName": output_pv_name,
-                        "storageClassName": "",
-                    },
-                )
+                    "volumeName": output_pv_name,
+                    "storageClassName": self.sc_name,
+                },
+            )
         else:
             body = client.V1PersistentVolumeClaim(
                 metadata=client.V1ObjectMeta(name=output_pvc_name),
@@ -279,6 +258,7 @@ class ADES_K8s(ADES_ABC):
                     "resources": {
                         "requests": {"storage": f"{resource_req['outdirMin']}Mi"}
                     },
+                    "storageClassName": self.sc_name,
                 },
             )
         self.core_client.create_namespaced_persistent_volume_claim(
