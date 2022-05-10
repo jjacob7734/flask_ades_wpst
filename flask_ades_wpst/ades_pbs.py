@@ -16,10 +16,10 @@ class ADES_PBS(ADES_ABC):
                  exit_code_fname = "exit_code.json", 
                  pbs_script_stub = """#!/bin/bash
 #
-#PBS -q debug
-#PBS -lselect=1:ncpus=1:model=has:aoe=sles12
-#PBS -lwalltime=2:00:00
-#PBS -lsite=nat=hfe1
+#PBS -q long
+#PBS -lselect=1:ncpus=1:model=bro
+#PBS -lwalltime=120:00:00
+#PBS -lsite=static_broadwell:nat=hfe1
 #
 # Setup
 module load singularity
@@ -27,7 +27,7 @@ module load singularity
 cd {}
 #
 # Run workflow
-cwl-runner --singularity --no-match-user --no-read-only {} {}
+cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir {} {}
 echo {{\\"exit_code\\": $?}} > {}
 """):
         self._base_work_dir = base_work_dir
@@ -119,8 +119,9 @@ echo {{\\"exit_code\\": $?}} > {}
     def undeploy_proc(self, proc_spec):
         container = proc_spec["executionUnit"]
         local_sif = self._construct_sif_name(container)
-        print("Removing local SIF {}".format(local_sif))
-        os.remove(local_sif)
+        if os.path.exists(local_sif):
+            print("Removing local SIF {}".format(local_sif))
+            os.remove(local_sif)
         return proc_spec
 
     def exec_job(self, job_spec):
@@ -144,8 +145,13 @@ echo {{\\"exit_code\\": $?}} > {}
         # Create PBS script in the work directory.
         pbs_script_fname = os.path.join(work_dir, self._pbs_script_fname)
         with open(pbs_script_fname, 'w') as pbs_script_file:
+            # The second format string below is the cwl-runner's tmpdir-prefix,
+            # which we set to the same as the work directory.  The os.path.join
+            # with '' is a trick to ensure that the trailing slash is included
+            # in the path.
             pbs_script_file.write(self._pbs_script_stub.\
-                                  format(work_dir,
+                                  format(work_dir, 
+                                         os.path.join(work_dir, ''),
                                          job_spec['process']['owsContextURL'],
                                          job_inputs_fname, 
                                          self._exit_code_fname))
