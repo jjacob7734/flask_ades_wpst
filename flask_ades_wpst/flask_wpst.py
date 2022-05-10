@@ -86,6 +86,10 @@ def processes_job(procID, jobID):
     elif request.method == 'DELETE':
         dismiss_status = ades_base.dismiss_job(procID, jobID)
         resp_dict = {"statusInfo": dismiss_status}
+        if not dismiss_status:
+            # OGC specs prescribe a status code 404 Not Found for this
+            # request to dismiss a job that doesn't exist.
+            status_code = 404 
     return resp_dict, status_code, {'ContentType':'application/json'}
     
 @app.route("/processes/<procID>/jobs/<jobID>/result", methods = ['GET'])
