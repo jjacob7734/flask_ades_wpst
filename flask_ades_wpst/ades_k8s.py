@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import yaml
 import base64
@@ -275,7 +276,7 @@ class ADES_K8s(ADES_ABC):
                             "image": "pymonger/calrissian:latest",
                             "imagePullPolicy": "Always",
                             "envFrom": [{"secretRef": {"name": "aws-creds"}}],
-                            "command": ["calrissian"],
+                            "command": ["/app/run_and_dump_usage.sh"],
                             "args": [
                                 "--stdout",
                                 f"/calrissian/output-data/{output_pvc_name}/docker-output.json",
@@ -389,6 +390,8 @@ class ADES_K8s(ADES_ABC):
                 k8s_job_spec["template"]["spec"]["containers"][0]["args"].extend(
                     [f"--{k}", f"{v}"]
                 )
+
+        # submit job
         job_id = f"calrissian-job-{id}"
         body = client.V1Job()
         body.metadata = client.V1ObjectMeta(namespace=self.ns, name=job_id)
@@ -460,6 +463,27 @@ class ADES_K8s(ADES_ABC):
                 job_spec["status"] = "running"
         else:
             raise NotImplemented(f"Unhandled condition type: {type(conditions)}")
+
+        # get job log
+        controller_uid = api_response.metadata.labels["controller-uid"]
+        pod_label_selector = "controller-uid=" + controller_uid
+        pods_list = self.core_client.list_namespaced_pod(
+            namespace=self.ns, label_selector=pod_label_selector
+        )
+        k8s_job_pod_id = pods_list.items[0].metadata.name
+        job_log = self.core_client.read_namespaced_pod_log(
+            name=k8s_job_pod_id, namespace=self.ns, pretty=True
+        )
+        # print(job_log)
+
+        # extract docker usage stats from job log
+        usage_re = re.compile(
+            r"# BEGIN docker-usage.json\n(.*)\n# END docker-usage.json", re.DOTALL
+        )
+        match = usage_re.search(job_log)
+        job_spec["metrics"] = json.loads(match.group(1)) if match else dict()
+        print(json.dumps(job_spec["metrics"], indent=2, sort_keys=True))
+
         return job_spec
 
     def get_job_results(self, job_spec):
