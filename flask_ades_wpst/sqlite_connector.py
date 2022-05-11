@@ -7,6 +7,7 @@ from datetime import datetime
 
 db_name = "./sqlite/soamc_ades.db"
 
+
 def create_connection(db_file):
     """ create a database connection to the SQLite database
         specified by db_file
@@ -21,6 +22,7 @@ def create_connection(db_file):
         print(e)
     return conn
 
+
 def create_table(conn, create_table_sql):
     """ create a table from the create_table_sql statement
     :param conn: Connection object
@@ -32,6 +34,7 @@ def create_table(conn, create_table_sql):
         c.execute(create_table_sql)
     except Error as e:
         print(e)
+
 
 def sqlite_db(func):
     def wrapper_sqlite_db(*args, **kwargs):
@@ -64,7 +67,9 @@ def sqlite_db(func):
             create_table(conn, sql_create_procs_table)
             create_table(conn, sql_create_jobs_table)
         return func(*args, **kwargs)
+
     return wrapper_sqlite_db
+
 
 @sqlite_db
 def sqlite_get_procs():
@@ -74,22 +79,29 @@ def sqlite_get_procs():
     cur.execute(sql_str)
     return cur.fetchall()
 
+
 @sqlite_db
 def sqlite_get_proc(proc_id):
     conn = create_connection(db_name)
     cur = conn.cursor()
     sql_str = """SELECT * FROM processes
-                 WHERE id = \"{}\"""".format(proc_id)
+                 WHERE id = \"{}\"""".format(
+        proc_id
+    )
     cur.execute(sql_str)
     res = cur.fetchall()
     num_matches = len(res)
     if num_matches == 1:
         res = res[0]
     else:
-        assert(num_matches == 0, 
-               "Found more than one match for {}. This should never happen.".
-               format(proc_id))
+        assert (
+            num_matches == 0,
+            "Found more than one match for {}. This should never happen.".format(
+                proc_id
+            ),
+        )
     return res
+
 
 @sqlite_db
 def sqlite_deploy_proc(proc_spec):
@@ -102,20 +114,22 @@ def sqlite_deploy_proc(proc_spec):
                                        jobControlOptions, outputTransmission,
                                        immediateDeployment, executionUnit)
                  VALUES(\"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", 
-                        \"{}\", \"{}\", \"{}\", \"{}\");""".\
-                 format(proc_desc2["id"], proc_desc2["title"],
-                        proc_desc2["abstract"],
-                        ','.join(proc_desc2["keywords"]),
-                        proc_desc2["owsContext"]["offering"]["content"]["href"],
-                        proc_desc["processVersion"],
-                        ','.join(proc_desc["jobControlOptions"]),
-                        ','.join(proc_desc["outputTransmission"]),
-                        int(proc_spec["immediateDeployment"]),
-                        ','.join([d["href"]
-                                  for d in proc_spec["executionUnit"]]))
+                        \"{}\", \"{}\", \"{}\", \"{}\");""".format(
+        proc_desc2["id"],
+        proc_desc2["title"],
+        proc_desc2["abstract"],
+        ",".join(proc_desc2["keywords"]),
+        proc_desc2["owsContext"]["offering"]["content"]["href"],
+        proc_desc["processVersion"],
+        ",".join(proc_desc["jobControlOptions"]),
+        ",".join(proc_desc["outputTransmission"]),
+        int(proc_spec["immediateDeployment"]),
+        ",".join([d["href"] for d in proc_spec["executionUnit"]]),
+    )
     cur.execute(sql_str)
     conn.commit()
     return sqlite_get_proc(proc_desc2["id"])
+
 
 @sqlite_db
 def sqlite_undeploy_proc(proc_id):
@@ -124,16 +138,20 @@ def sqlite_undeploy_proc(proc_id):
         conn = create_connection(db_name)
         cur = conn.cursor()
         sql_str = """DELETE FROM processes
-                     WHERE id = \"{}\"""".format(proc_id)
+                     WHERE id = \"{}\"""".format(
+            proc_id
+        )
         cur.execute(sql_str)
         conn.commit()
     return proc_desc
 
+
 def sqlite_get_headers(cur, tname):
-    sql_str = "SELECT name FROM PRAGMA_TABLE_INFO(\"{}\");".format(tname)
+    sql_str = 'SELECT name FROM PRAGMA_TABLE_INFO("{}");'.format(tname)
     cur.execute(sql_str)
     col_headers = [t[0] for t in cur.fetchall()]
     return col_headers
+
 
 @sqlite_db
 def sqlite_get_jobs(proc_id=None):
@@ -148,12 +166,15 @@ def sqlite_get_jobs(proc_id=None):
     job_dicts = [dict(zip(col_headers, job)) for job in job_list]
     return job_dicts
 
+
 @sqlite_db
 def sqlite_get_job(job_id):
     conn = create_connection(db_name)
     cur = conn.cursor()
     sql_str = """SELECT * FROM jobs
-                 WHERE jobID = \"{}\"""".format(job_id)
+                 WHERE jobID = \"{}\"""".format(
+        job_id
+    )
     job_matches = cur.execute(sql_str).fetchall()
     num_matches = len(job_matches)
     if num_matches == 0:
@@ -164,26 +185,36 @@ def sqlite_get_job(job_id):
         job_dict = {}
         for i, col in enumerate(col_headers):
             # deserialize JSON data fields
-            if col in ("inputs", "backend_info"):
+            if col in ("inputs", "backend_info", "metrics"):
                 job_dict[col] = json.loads(job[i])
             else:
                 job_dict[col] = job[i]
     else:
         # This should never happen.
-        raise ValueError("Found more than one match for job ID {}".
-                         format(job_id))
+        raise ValueError("Found more than one match for job ID {}".format(job_id))
     return job_dict
+
 
 @sqlite_db
 def sqlite_exec_job(proc_id, job_id, job_spec, backend_info):
     conn = create_connection(db_name)
     cur = conn.cursor()
-    cur.execute("""INSERT INTO jobs(jobID, procID, inputs, backend_info, status, timestamp)
-                VALUES(?, ?, ?, ?, ?, ?)""", [
-                    job_id, proc_id, json.dumps(job_spec), json.dumps(backend_info),
-                    "accepted", datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")])
+    cur.execute(
+        """INSERT INTO jobs(jobID, procID, inputs, backend_info, metrics, status, timestamp)
+                VALUES(?, ?, ?, ?, ?, ?, ?)""",
+        [
+            job_id,
+            proc_id,
+            json.dumps(job_spec),
+            json.dumps(backend_info),
+            "{}",
+            "accepted",
+            datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        ],
+    )
     conn.commit()
     return sqlite_get_job(job_id)
+
 
 @sqlite_db
 def sqlite_update_job_status(job_id, status, metrics):
@@ -193,14 +224,16 @@ def sqlite_update_job_status(job_id, status, metrics):
                  SET status = \"{}\",
                      metrics = \'{}\',
                      timestamp = \"{}\"
-                 WHERE jobID = \"{}\"""".\
-                 format(status,
-                        json.dumps(metrics),
-                        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                        job_id)
+                 WHERE jobID = \"{}\"""".format(
+        status,
+        json.dumps(metrics),
+        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        job_id,
+    )
     cur.execute(sql_str)
     conn.commit()
     return sqlite_get_job(job_id)
+
 
 @sqlite_db
 def sqlite_dismiss_job(job_id):
