@@ -2,11 +2,21 @@ import sys
 import requests
 import json
 import hashlib
-from flask_ades_wpst.sqlite_connector import sqlite_get_procs, sqlite_get_proc, sqlite_deploy_proc, sqlite_undeploy_proc, sqlite_get_jobs, sqlite_get_job, sqlite_exec_job, sqlite_dismiss_job, sqlite_update_job_status
+from flask_ades_wpst.sqlite_connector import (
+    sqlite_get_procs,
+    sqlite_get_proc,
+    sqlite_deploy_proc,
+    sqlite_undeploy_proc,
+    sqlite_get_jobs,
+    sqlite_get_job,
+    sqlite_exec_job,
+    sqlite_dismiss_job,
+    sqlite_update_job_status,
+)
 from datetime import datetime
 
-class ADES_Base:
 
+class ADES_Base:
     def __init__(self, app_config):
         self._app_config = app_config
         self._platform = app_config["PLATFORM"]
@@ -21,31 +31,32 @@ class ADES_Base:
             # platform here, you must also add it to the valid_platforms
             # tuple default argument to the flask_wpst function in
             # flask_wpst.py.
-            raise ValueError("Platform {} not implemented.".\
-                             format(self._platform))
+            raise ValueError("Platform {} not implemented.".format(self._platform))
         self._ades = ADES_Platform()
-        
+
     def proc_dict(self, proc):
-        return {"id": proc[0],
-                "title": proc[1],
-                "abstract": proc[2],
-                "keywords": proc[3],
-                "owsContextURL": proc[4],
-                "processVersion": proc[5],
-                "jobControlOptions": proc[6].split(','),
-                "outputTransmission": proc[7].split(','),
-                "immediateDeployment": str(bool(proc[8])).lower(),
-                "executionUnit": proc[9]}
-    
+        return {
+            "id": proc[0],
+            "title": proc[1],
+            "abstract": proc[2],
+            "keywords": proc[3],
+            "owsContextURL": proc[4],
+            "processVersion": proc[5],
+            "jobControlOptions": proc[6].split(","),
+            "outputTransmission": proc[7].split(","),
+            "immediateDeployment": str(bool(proc[8])).lower(),
+            "executionUnit": proc[9],
+        }
+
     def get_procs(self):
         saved_procs = sqlite_get_procs()
         procs = [self.proc_dict(saved_proc) for saved_proc in saved_procs]
         return procs
-    
+
     def get_proc(self, proc_id):
         proc_desc = sqlite_get_proc(proc_id)
         return self.proc_dict(proc_desc)
-    
+
     def deploy_proc(self, proc_desc_url):
         response = requests.get(proc_desc_url)
         if response.status_code == 200:
@@ -62,7 +73,7 @@ class ADES_Base:
             sqlite_deploy_proc(proc_spec)
             ades_resp = self._ades.deploy_proc(proc_spec)
         return proc_spec
-            
+
     def undeploy_proc(self, proc_id):
         proc_desc = sqlite_undeploy_proc(proc_id)
         if proc_desc:
@@ -86,14 +97,19 @@ class ADES_Base:
         #   percentCompleted (int) in range [0, 100]
         job_spec = sqlite_get_job(job_id)
 
-        # if job was dismissed, then bypass querying the ADES backend
-        job_info = {"jobID": job_id, "status": job_spec["status"]}
-        if job_spec["status"] == "dismissed":
+        # bypass querying the ADES backend if status is either:
+        # dismissed, successful, or failed
+        job_info = {
+            "jobID": job_id,
+            "status": job_spec["status"],
+            "metrics": job_spec["metrics"],
+        }
+        if job_spec["status"] in ("dismissed", "successful", "failed"):
             return job_info
 
         # otherwise, query the ADES backend for the current status
         ades_resp = self._ades.get_job(job_spec)
-        #print(ades_resp)
+        # print(ades_resp)
         job_info["status"] = ades_resp["status"]
 
         # populate current metrics
@@ -113,11 +129,11 @@ class ADES_Base:
             "job_id": job_id,
         }
         ades_resp = self._ades.exec_job(job_spec)
-        # ades_resp will return platform specific information that should be 
+        # ades_resp will return platform specific information that should be
         # kept in the database with the job ID record
         sqlite_exec_job(proc_id, job_id, job_inputs, ades_resp)
         return {"jobID": job_id, "status": ades_resp["status"]}
-            
+
     def dismiss_job(self, proc_id, job_id):
         job_spec = sqlite_dismiss_job(job_id)
         if job_spec:
@@ -127,5 +143,9 @@ class ADES_Base:
     def get_job_results(self, proc_id, job_id):
         job_spec = self.get_job(proc_id, job_id)
         ades_resp = self._ades.get_job_results(job_spec)
-        job_info = {"jobID": job_id, "status": ades_resp["status"], "links": ades_resp["links"]}
+        job_info = {
+            "jobID": job_id,
+            "status": ades_resp["status"],
+            "links": ades_resp["links"],
+        }
         return job_info
