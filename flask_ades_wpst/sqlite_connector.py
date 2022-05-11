@@ -57,6 +57,7 @@ def sqlite_db(func):
                                          procID TEXT,
                                          inputs DATA,
                                          backend_info DATA,
+                                         metrics DATA,
                                          status TEXT,
                                          timestamp TEXT
                                        );"""
@@ -185,14 +186,16 @@ def sqlite_exec_job(proc_id, job_id, job_spec, backend_info):
     return sqlite_get_job(job_id)
 
 @sqlite_db
-def sqlite_update_job_status(job_id, status):
+def sqlite_update_job_status(job_id, status, metrics):
     conn = create_connection(db_name)
     cur = conn.cursor()
     sql_str = """UPDATE jobs
                  SET status = \"{}\",
+                     metrics = \'{}\',
                      timestamp = \"{}\"
                  WHERE jobID = \"{}\"""".\
                  format(status,
+                        json.dumps(metrics),
                         datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                         job_id)
     cur.execute(sql_str)
@@ -203,7 +206,7 @@ def sqlite_update_job_status(job_id, status):
 def sqlite_dismiss_job(job_id):
     job_dict = sqlite_get_job(job_id)
     if job_dict:
-        resp = sqlite_update_job_status(job_id, "dismissed")
+        resp = sqlite_update_job_status(job_id, "dismissed", {})
     else:
         resp = {}
     return resp

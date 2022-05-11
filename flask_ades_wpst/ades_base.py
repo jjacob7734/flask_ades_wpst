@@ -96,8 +96,11 @@ class ADES_Base:
         #print(ades_resp)
         job_info["status"] = ades_resp["status"]
 
+        # populate current metrics
+        job_info["metrics"] = ades_resp["metrics"]
+
         # and update the db with that status
-        sqlite_update_job_status(job_id, job_info["status"])
+        sqlite_update_job_status(job_id, job_info["status"], job_info["metrics"])
         return job_info
 
     def exec_job(self, proc_id, job_inputs):
