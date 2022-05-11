@@ -205,6 +205,9 @@ echo {{\\"exit_code\\": $?}} > {}
         print("qstat_resp:", qstat_resp)
         job_spec["status"] = \
             self._get_status_from_qstat_stdout(work_dir, qstat_resp.stdout)
+
+        # TODO: populate metrics from PBS; for now return empty metrics
+        job_spec["metrics"] = {}
         
         return job_spec
 
