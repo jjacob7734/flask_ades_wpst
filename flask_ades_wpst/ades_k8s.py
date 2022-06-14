@@ -393,9 +393,7 @@ class ADES_K8s(ADES_ABC):
 
         # create job_id and prepend to script inputs
         job_id = f"calrissian-job-{id}"
-        k8s_job_spec["template"]["spec"]["containers"][0]["args"].insert(
-            0, job_id
-        )
+        k8s_job_spec["template"]["spec"]["containers"][0]["args"].insert(0, job_id)
 
         # submit job
         body = client.V1Job()
@@ -490,7 +488,9 @@ class ADES_K8s(ADES_ABC):
                 # get job log
                 try:
                     job_log = self.core_client.read_namespaced_pod_log(
-                        name=pod_info_sanitized["metadata"]["name"], namespace=self.ns, pretty=True
+                        name=pod_info_sanitized["metadata"]["name"],
+                        namespace=self.ns,
+                        pretty=True,
                     )
                     # print(job_log)
                 except ApiException:
@@ -498,19 +498,22 @@ class ADES_K8s(ADES_ABC):
 
                 # extract docker usage stats from job log
                 usage_re = re.compile(
-                    r"# BEGIN docker-usage.json\n(.*)\n# END docker-usage.json", re.DOTALL
+                    r"# BEGIN docker-usage.json\n(.*)\n# END docker-usage.json",
+                    re.DOTALL,
                 )
                 match = usage_re.search(job_log)
                 usage_stats = json.loads(match.group(1)) if match else dict()
-                #print(json.dumps(usage_stats, indent=2, sort_keys=True))
+                # print(json.dumps(usage_stats, indent=2, sort_keys=True))
             else:
-                pod_info_dict[pod_info_sanitized["spec"]["containers"][0]["name"]] =pod_info_sanitized  
+                pod_info_dict[
+                    pod_info_sanitized["spec"]["containers"][0]["name"]
+                ] = pod_info_sanitized
 
         # collect metrics from usage stats
         if len(usage_stats) > 0:
             metrics = {
                 "workflow": {
-                    "exit_code": 0 if job_spec["status"] == "successful" else 1, 
+                    "exit_code": 0 if job_spec["status"] == "successful" else 1,
                     "time_queued": job_info_sanitized["status"]["startTime"],
                     "time_started": usage_stats["start_time"],
                     "time_end": usage_stats["finish_time"],
@@ -520,21 +523,26 @@ class ADES_K8s(ADES_ABC):
                         "name": child["name"],
                         "time_started": child["start_time"],
                         "time_end": child["finish_time"],
-                        "work_dir_size_gb": child["disk_megabytes"]/1024.,
-                        "memory_max_gb": child["ram_megabytes"]/1024.,
+                        "work_dir_size_gb": child["disk_megabytes"] / 1024.0,
+                        "memory_max_gb": child["ram_megabytes"] / 1024.0,
                         "node": {
                             "cores": child["cpus"],
                             "memory_gb": "unknown",
-                            "hostname": pod_info_dict[f"{child['name'].replace('_', '-')}-container"]["status"]["podIP"],
-                            "ip_address":pod_info_dict[f"{child['name'].replace('_', '-')}-container"]["status"]["podIP"], 
-                            "disk_space_free_gb": "unknown"
-                        }
-                    } for child in usage_stats["children"]
+                            "hostname": pod_info_dict[
+                                f"{child['name'].replace('_', '-')}-container"
+                            ]["status"]["podIP"],
+                            "ip_address": pod_info_dict[
+                                f"{child['name'].replace('_', '-')}-container"
+                            ]["status"]["podIP"],
+                            "disk_space_free_gb": "unknown",
+                        },
+                    }
+                    for child in usage_stats["children"]
                 ],
                 "blob": usage_stats,
             }
             job_spec["metrics"] = metrics
-            #print(json.dumps(job_spec["metrics"], indent=2, sort_keys=True))
+            # print(json.dumps(job_spec["metrics"], indent=2, sort_keys=True))
 
         return job_spec
 
