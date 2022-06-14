@@ -391,8 +391,13 @@ class ADES_K8s(ADES_ABC):
                     [f"--{k}", f"{v}"]
                 )
 
-        # submit job
+        # create job_id and prepend to script inputs
         job_id = f"calrissian-job-{id}"
+        k8s_job_spec["template"]["spec"]["containers"][0]["args"].insert(
+            0, job_id
+        )
+
+        # submit job
         body = client.V1Job()
         body.metadata = client.V1ObjectMeta(namespace=self.ns, name=job_id)
         body.status = client.V1JobStatus()
@@ -435,18 +440,18 @@ class ADES_K8s(ADES_ABC):
         # print(f"job_spec: {json.dumps(job_spec, indent=2)}")
         k8s_job_id = job_spec["backend_info"]["k8s_job_id"]
         batch_api = client.BatchV1Api()
-        api_response = batch_api.read_namespaced_job(
+        job_info = batch_api.read_namespaced_job(
             name=k8s_job_id, namespace=self.ns, pretty=True
         )
-        print(api_response.status)
-        # api_response_sanitized = client.ApiClient().sanitize_for_serialization(api_response)
-        # print(f"api_response_sanitized: {json.dumps(api_response_sanitized, indent=2)}")
+        # print(job_info.status)
+        job_info_sanitized = client.ApiClient().sanitize_for_serialization(job_info)
+        # print(f"job_info_sanitized: {json.dumps(job_info_sanitized, indent=2)}")
 
         # determine K8s job state:
         # https://v1-19.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#job-v1-batch
         # and map to ADES job state:
         # https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/master/core/openapi/schemas/statusCode.yaml
-        conditions = api_response.status.conditions
+        conditions = job_info.status.conditions
         # print(f"condtions: {conditions}")
         if isinstance(conditions, list):
             for condition in conditions:
@@ -459,30 +464,77 @@ class ADES_K8s(ADES_ABC):
                 else:
                     raise NotImplemented(f"Unhandled condition: {condition}")
         elif conditions is None:
-            if api_response.status.active > 0:
+            if job_info.status.active > 0:
                 job_spec["status"] = "running"
         else:
             raise NotImplemented(f"Unhandled condition type: {type(conditions)}")
 
-        # get job log
-        controller_uid = api_response.metadata.labels["controller-uid"]
-        pod_label_selector = "controller-uid=" + controller_uid
+        # set default job log
+        job_log = ""
+
+        # set empty usage stats
+        usage_stats = dict()
+
+        # get info on all pods related to this job
+        pod_info_dict = {}
+        pod_label_selector = "job-name=" + k8s_job_id
         pods_list = self.core_client.list_namespaced_pod(
             namespace=self.ns, label_selector=pod_label_selector
         )
-        k8s_job_pod_id = pods_list.items[0].metadata.name
-        job_log = self.core_client.read_namespaced_pod_log(
-            name=k8s_job_pod_id, namespace=self.ns, pretty=True
-        )
-        # print(job_log)
+        for pod_info in pods_list.items:
+            pod_info_sanitized = client.ApiClient().sanitize_for_serialization(pod_info)
+            # print(f"pod_info_sanitized: {json.dumps(pod_info_sanitized, indent=2)}")
 
-        # extract docker usage stats from job log
-        usage_re = re.compile(
-            r"# BEGIN docker-usage.json\n(.*)\n# END docker-usage.json", re.DOTALL
-        )
-        match = usage_re.search(job_log)
-        job_spec["metrics"] = json.loads(match.group(1)) if match else dict()
-        print(json.dumps(job_spec["metrics"], indent=2, sort_keys=True))
+            # identify job pod and process differently
+            if "controller-uid" in pod_info_sanitized["metadata"]["labels"]:
+                # get job log
+                try:
+                    job_log = self.core_client.read_namespaced_pod_log(
+                        name=pod_info_sanitized["metadata"]["name"], namespace=self.ns, pretty=True
+                    )
+                    # print(job_log)
+                except ApiException:
+                    pass
+
+                # extract docker usage stats from job log
+                usage_re = re.compile(
+                    r"# BEGIN docker-usage.json\n(.*)\n# END docker-usage.json", re.DOTALL
+                )
+                match = usage_re.search(job_log)
+                usage_stats = json.loads(match.group(1)) if match else dict()
+                #print(json.dumps(usage_stats, indent=2, sort_keys=True))
+            else:
+                pod_info_dict[pod_info_sanitized["spec"]["containers"][0]["name"]] =pod_info_sanitized  
+
+        # collect metrics from usage stats
+        if len(usage_stats) > 0:
+            metrics = {
+                "workflow": {
+                    "exit_code": 0 if job_spec["status"] == "successful" else 1, 
+                    "time_queued": job_info_sanitized["status"]["startTime"],
+                    "time_started": usage_stats["start_time"],
+                    "time_end": usage_stats["finish_time"],
+                },
+                "processes": [
+                    {
+                        "name": child["name"],
+                        "time_started": child["start_time"],
+                        "time_end": child["finish_time"],
+                        "work_dir_size_gb": child["disk_megabytes"]/1024.,
+                        "memory_max_gb": child["ram_megabytes"]/1024.,
+                        "node": {
+                            "cores": child["cpus"],
+                            "memory_gb": "unknown",
+                            "hostname": pod_info_dict[f"{child['name'].replace('_', '-')}-container"]["status"]["podIP"],
+                            "ip_address":pod_info_dict[f"{child['name'].replace('_', '-')}-container"]["status"]["podIP"], 
+                            "disk_space_free_gb": "unknown"
+                        }
+                    } for child in usage_stats["children"]
+                ],
+                "blob": usage_stats,
+            }
+            job_spec["metrics"] = metrics
+            #print(json.dumps(job_spec["metrics"], indent=2, sort_keys=True))
 
         return job_spec
 
