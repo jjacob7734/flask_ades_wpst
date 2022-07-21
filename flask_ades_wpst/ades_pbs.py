@@ -27,7 +27,7 @@ module load singularity
 cd {}
 #
 # Run workflow
-cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir {} {}
+cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > cwl-runner.log 2>&1
 echo {{\\"exit_code\\": $?}} > {}
 """):
         self._base_work_dir = base_work_dir
