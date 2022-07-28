@@ -14,6 +14,8 @@ class ADES_PBS(ADES_ABC):
                  pbs_qdel_cmd='./bin/qdel', pbs_qstat_cmd='./bin/qstat',
                  pbs_script_fname='pbs.bash',
                  exit_code_fname = "exit_code.json", 
+                 cwl_runner_log_fname = "cwl_runner.log",
+                 metrics_fname = "metrics.json",
                  pbs_script_stub = """#!/bin/bash
 #
 #PBS -q long
@@ -27,8 +29,9 @@ module load singularity
 cd {}
 #
 # Run workflow
-cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir {} {}
+cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
 echo {{\\"exit_code\\": $?}} > {}
+python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {} -p {}
 """):
         self._base_work_dir = base_work_dir
         self._job_inputs_fname = job_inputs_fname
@@ -40,6 +43,8 @@ echo {{\\"exit_code\\": $?}} > {}
         self._pbs_qdel_cmd = pbs_qdel_cmd
         self._pbs_qstat_cmd = pbs_qstat_cmd
         self._exit_code_fname = exit_code_fname
+        self._cwl_runner_log_fname = cwl_runner_log_fname
+        self._metrics_fname = metrics_fname
         self._pbs_script_stub = pbs_script_stub
 
     def _construct_sif_name(self, docker_url):
@@ -153,8 +158,13 @@ echo {{\\"exit_code\\": $?}} > {}
                                   format(work_dir, 
                                          os.path.join(work_dir, ''),
                                          job_spec['process']['owsContextURL'],
-                                         job_inputs_fname, 
-                                         self._exit_code_fname))
+                                         job_inputs_fname,
+                                         self._cwl_runner_log_fname,
+                                         self._exit_code_fname,
+                                         self._cwl_runner_log_fname,
+                                         self._metrics_fname,
+                                         self._exit_code_fname,
+                                         self._pbs_script_fname))
 
         # Submit job to queue for execution.
         qsub_resp = run([self._pbs_qsub_cmd, "-N", job_id, "-o", work_dir, 
@@ -206,8 +216,14 @@ echo {{\\"exit_code\\": $?}} > {}
         job_spec["status"] = \
             self._get_status_from_qstat_stdout(work_dir, qstat_resp.stdout)
 
-        # TODO: populate metrics from PBS; for now return empty metrics
-        job_spec["metrics"] = {}
+        metrics_fname = os.path.join(work_dir, self._metrics_fname)
+        if os.path.exists(metrics_fname):
+            # Read metrics from file create after execution.
+            with open(metrics_fname, 'r') as f:
+                job_spec["metrics"] = json.loads(f.read())
+        else:
+            # Initialize metrics to empty dict to be populated after execution.
+            job_spec["metrics"] = {}
         
         return job_spec
 
