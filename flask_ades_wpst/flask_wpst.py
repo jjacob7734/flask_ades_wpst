@@ -8,8 +8,10 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("-H", "--host", default="127.0.0.1",
                         help="host IP address for Flask server")
+    parser.add_argument("-p", "--port", default=5000,
+                        help="host port number for Flask server")
     args = parser.parse_args()
-    return args.host
+    return args.host, args.port
 
 app = Flask(__name__)
 
@@ -99,17 +101,17 @@ def processes_result(procID, jobID):
     resp_dict = ades_base.get_job_results(procID, jobID)
     return resp_dict, status_code, {'ContentType':'application/json'}
 
-def flask_wpst(app, debug=False, host="127.0.0.1",
+def flask_wpst(app, debug=False, host="127.0.0.1", port=5000,
                valid_platforms = ("Generic", "K8s", "PBS")):
     platform = os.environ.get("ADES_PLATFORM", default="Generic")
     if platform not in valid_platforms:
         raise ValueError("ADES_PLATFORM invalid - {} not in {}.".\
                          format(platform, valid_platforms))
     app.config["PLATFORM"] = platform
-    app.run(debug=debug, host=host)
+    app.run(debug=debug, host=host, port=port)
     
 
 if __name__ == "__main__":
     print ("starting")
-    host = parse_args()
-    flask_wpst(app, debug=True, host=host)
+    host, port = parse_args()
+    flask_wpst(app, debug=True, host=host, port=port)
