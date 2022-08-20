@@ -31,7 +31,7 @@ cd {}
 # Run workflow
 cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
 echo {{\\"exit_code\\": $?}} > {}
-python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {} -p {}
+python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
 """):
         self._base_work_dir = base_work_dir
         self._job_inputs_fname = job_inputs_fname
@@ -163,8 +163,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {} -p {}
                                          self._exit_code_fname,
                                          self._cwl_runner_log_fname,
                                          self._metrics_fname,
-                                         self._exit_code_fname,
-                                         self._pbs_script_fname))
+                                         self._exit_code_fname))
 
         # Submit job to queue for execution.
         qsub_resp = run([self._pbs_qsub_cmd, "-N", job_id, "-o", work_dir, 
