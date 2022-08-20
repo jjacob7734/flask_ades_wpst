@@ -33,6 +33,7 @@ class ADES_Base:
             # flask_wpst.py.
             raise ValueError("Platform {} not implemented.".format(self._platform))
         self._ades = ADES_Platform()
+        self._ades_id = app_config["ADES_ID"]
 
     def proc_dict(self, proc):
         return {

@@ -3,6 +3,20 @@ from flask import Flask, request, Response
 import json
 import os
 from flask_ades_wpst.ades_base import ADES_Base
+import hashlib
+from socket import getfqdn
+from datetime import datetime
+
+
+app = Flask(__name__)
+
+def default_ades_id():
+    # Create a hash string using the hostname and current date-time and use 
+    # it in the default ADES ID to make it unique.
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
+    hostname = getfqdn()
+    return "-".join(["ades",
+                     hashlib.sha1((hostname + now).encode()).hexdigest()])
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
@@ -10,10 +24,17 @@ def parse_args():
                         help="host IP address for Flask server")
     parser.add_argument("-p", "--port", default=5000,
                         help="host port number for Flask server")
+    parser.add_argument("-n", "--name", 
+                        help="ID of this ADES instance")
     args = parser.parse_args()
-    return args.host, args.port
+    return args.host, args.port, args.name
 
-app = Flask(__name__)
+def ades_resp(d):
+    '''Inject additional elements into every endpoint response.
+    '''
+    # Add ADES ID to the Flask endpoint return dictionary.
+    d |= { "ades-id": app.config["ADES_ID"] }
+    return d
 
 @app.route("/", methods = ['GET'])
 def root():
@@ -36,7 +57,8 @@ def root():
         {"href": "/processes/<procID>/jobs/<jobID>/result", "type": "GET",
          "title": "getResult"}]}}
     status_code = 200
-    return resp_dict, status_code, {'ContentType':'application/json'}
+    return (ades_resp(resp_dict), 
+            status_code, {'ContentType':'application/json'})
 
 @app.route("/processes", methods = ['GET', 'POST'])
 def processes():
@@ -52,7 +74,8 @@ def processes():
         proc_info = ades_base.deploy_proc(req_vals["proc"])
         resp_dict = {"deploymentResult": {"processSummary": proc_info}}
         status_code = 201
-    return resp_dict, status_code, {'ContentType':'application/json'}
+    return (ades_resp(resp_dict), 
+            status_code, {'ContentType':'application/json'})
 
 @app.route("/processes/<procID>", methods = ['GET', 'DELETE'])
 def processes_id(procID):
@@ -63,7 +86,8 @@ def processes_id(procID):
         resp_dict = {"process": ades_base.get_proc(procID)}
     elif request.method == "DELETE":
         resp_dict = {"undeploymentResult": ades_base.undeploy_proc(procID)}
-    return resp_dict, status_code, {'ContentType':'application/json'}
+    return (ades_resp(resp_dict), 
+            status_code, {'ContentType':'application/json'})
 
 @app.route("/processes/<procID>/jobs", methods = ['GET', 'POST'])
 def processes_jobs(procID):
@@ -77,7 +101,8 @@ def processes_jobs(procID):
         job_params = request.get_json()
         job_info = ades_base.exec_job(procID, job_params)
         resp_dict = job_info
-    return resp_dict, status_code, {'ContentType':'application/json'}
+    return (ades_resp(resp_dict), 
+            status_code, {'ContentType':'application/json'})
 
 @app.route("/processes/<procID>/jobs/<jobID>", methods = ['GET', 'DELETE'])
 def processes_job(procID, jobID):
@@ -92,14 +117,16 @@ def processes_job(procID, jobID):
             # OGC specs prescribe a status code 404 Not Found for this
             # request to dismiss a job that doesn't exist.
             status_code = 404 
-    return resp_dict, status_code, {'ContentType':'application/json'}
+    return (ades_resp(resp_dict), 
+            status_code, {'ContentType':'application/json'})
     
 @app.route("/processes/<procID>/jobs/<jobID>/result", methods = ['GET'])
 def processes_result(procID, jobID):
     status_code = 200
     ades_base = ADES_Base(app.config)
     resp_dict = ades_base.get_job_results(procID, jobID)
-    return resp_dict, status_code, {'ContentType':'application/json'}
+    return (ades_resp(resp_dict), 
+            status_code, {'ContentType':'application/json'})
 
 def flask_wpst(app, debug=False, host="127.0.0.1", port=5000,
                valid_platforms = ("Generic", "K8s", "PBS")):
@@ -113,5 +140,8 @@ def flask_wpst(app, debug=False, host="127.0.0.1", port=5000,
 
 if __name__ == "__main__":
     print ("starting")
-    host, port = parse_args()
-    flask_wpst(app, debug=True, host=host, port=port)
+    flask_host, flask_port, ades_id = parse_args()
+    if ades_id is None:
+        ades_id = default_ades_id()
+    app.config["ADES_ID"] = ades_id
+    flask_wpst(app, debug=True, host=flask_host, port=flask_port)
