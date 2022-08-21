@@ -20,6 +20,7 @@ def default_ades_id():
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument("-d", "--debug", action="store_true")
     parser.add_argument("-H", "--host", default="127.0.0.1",
                         help="host IP address for Flask server")
     parser.add_argument("-p", "--port", default=5000,
@@ -27,7 +28,7 @@ def parse_args():
     parser.add_argument("-n", "--name", 
                         help="ID of this ADES instance")
     args = parser.parse_args()
-    return args.host, args.port, args.name
+    return args.debug, args.host, args.port, args.name
 
 def ades_resp(d):
     '''Inject additional elements into every endpoint response.
@@ -140,8 +141,8 @@ def flask_wpst(app, debug=False, host="127.0.0.1", port=5000,
 
 if __name__ == "__main__":
     print ("starting")
-    flask_host, flask_port, ades_id = parse_args()
+    debug_mode, flask_host, flask_port, ades_id = parse_args()
     if ades_id is None:
         ades_id = default_ades_id()
     app.config["ADES_ID"] = ades_id
-    flask_wpst(app, debug=True, host=flask_host, port=flask_port)
+    flask_wpst(app, debug=debug_mode, host=flask_host, port=flask_port)
