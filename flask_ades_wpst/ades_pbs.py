@@ -10,7 +10,7 @@ class ADES_PBS(ADES_ABC):
 
     def __init__(self, ades_id, 
                  base_ades_home_dir='./ades', base_work_dir='./jobs',
-                 job_inputs_fname='inputs.yml',
+                 job_inputs_fname='inputs.json',
                  sing_stash_dir='./singularity', module_cmd='modulecmd',
                  singularity_cmd='./bin/singularity',
                  pbs_qsub_cmd='./bin/qsub', pbs_qdel_cmd='./bin/qdel',
@@ -154,7 +154,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         except:
             raise OSError("Could not create work directory {} for job {}".format(work_dir, job_id))
 
-        # Write job inputs YAML to a file in the work directory.
+        # Write job inputs to a JSON file in the work directory.
         job_inputs_fname = os.path.join(work_dir, self._job_inputs_fname)
         with open(job_inputs_fname, 'w', encoding='utf-8') as job_inputs_file:
             json.dump(job_spec['inputs'], job_inputs_file, ensure_ascii=False,
