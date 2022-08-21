@@ -3,7 +3,7 @@ import json
 import sqlite3
 import requests
 import yaml
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class SQLiteConnector():
@@ -72,7 +72,8 @@ class SQLiteConnector():
                                              backend_info DATA,
                                              metrics DATA,
                                              status TEXT,
-                                             timestamp TEXT
+                                             timeCreated TEXT,
+                                             timeUpdated TEXT
                                            );"""
                 self._create_table(conn, sql_create_procs_table)
                 self._create_table(conn, sql_create_jobs_table)
@@ -194,11 +195,12 @@ class SQLiteConnector():
     @sqlite_db
     def sqlite_exec_job(self, proc_id, job_id, job_spec, job_owner,
                         backend_info):
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S%z")
         conn = self._create_connection(self._db_name)
         cur = conn.cursor()
         cur.execute(
-            """INSERT INTO jobs(jobID, jobOwner, procID, inputs, backend_info, metrics, status, timestamp)
-                    VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO jobs(jobID, jobOwner, procID, inputs, backend_info, metrics, status, timeCreated, timeUpdated)
+                    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 job_id,
                 job_owner,
@@ -207,7 +209,8 @@ class SQLiteConnector():
                 json.dumps(backend_info),
                 "{}",
                 "accepted",
-                datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                now,
+                now
             ],
         )
         conn.commit()
@@ -220,11 +223,11 @@ class SQLiteConnector():
         sql_str = """UPDATE jobs
                      SET status = \"{}\",
                          metrics = \'{}\',
-                         timestamp = \"{}\"
+                         timeUpdated = \"{}\"
                      WHERE jobID = \"{}\"""".format(
             status,
             json.dumps(metrics),
-            datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S%z"),
             job_id,
         )
         cur.execute(sql_str)

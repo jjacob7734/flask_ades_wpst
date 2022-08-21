@@ -104,6 +104,7 @@ class ADES_Base:
         job_info = {
             "jobID": job_id,
             "username": job_spec["jobOwner"],
+            "time_queued": job_spec["timeCreated"],
             "status": job_spec["status"],
             "metrics": job_spec["metrics"]
         }
