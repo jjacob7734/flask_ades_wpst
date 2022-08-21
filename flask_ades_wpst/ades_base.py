@@ -22,7 +22,9 @@ class ADES_Base:
             # platform here, you must also add it to the valid_platforms
             # tuple default argument to the flask_wpst function in
             # flask_wpst.py.
-            raise ValueError("Platform {} not implemented.".format(self._platform))
+            raise ValueError("Platform {} not implemented.".
+                             format(self._platform))
+        self._default_user = "anonymous"
         self._ades_id = app_config["ADES_ID"]
         self._ades = ADES_Platform(self._ades_id)
         ades_home_dir = os.path.join("./ades", self._ades_id)
@@ -101,8 +103,9 @@ class ADES_Base:
         # dismissed, successful, or failed
         job_info = {
             "jobID": job_id,
+            "username": job_spec["jobOwner"],
             "status": job_spec["status"],
-            "metrics": job_spec["metrics"],
+            "metrics": job_spec["metrics"]
         }
         if job_spec["status"] in ("dismissed", "successful", "failed"):
             return job_info
@@ -121,20 +124,23 @@ class ADES_Base:
                                                         job_info["metrics"])
         return job_info
 
-    def exec_job(self, proc_id, job_inputs):
+    def exec_job(self, proc_id, job_inputs, req_vals):
         now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
         # TODO: this needs to be globally unique despite underlying processing cluster
         job_id = f"{proc_id}-{hashlib.sha1((json.dumps(job_inputs, sort_keys=True) + now).encode()).hexdigest()}"
+        job_owner = req_vals["user"] \
+            if "user" in req_vals else self._default_user
         job_spec = {
             "process": self.get_proc(proc_id),
             "inputs": job_inputs,
             "job_id": job_id,
+            "job_owner": job_owner
         }
         ades_resp = self._ades.exec_job(job_spec)
         # ades_resp will return platform specific information that should be
         # kept in the database with the job ID record
         self._sqlite_connector.sqlite_exec_job(proc_id, job_id, job_inputs,
-                                               ades_resp)
+                                               job_owner, ades_resp)
         return {"jobID": job_id, "status": ades_resp["status"]}
 
     def dismiss_job(self, proc_id, job_id):

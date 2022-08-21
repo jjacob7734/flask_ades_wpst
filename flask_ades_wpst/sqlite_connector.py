@@ -66,6 +66,7 @@ class SQLiteConnector():
                                             );"""
                 sql_create_jobs_table = """CREATE TABLE IF NOT EXISTS jobs (
                                              jobID TEXT PRIMARY KEY,
+                                             jobOwner TEXT,
                                              procID TEXT,
                                              inputs DATA,
                                              backend_info DATA,
@@ -163,7 +164,6 @@ class SQLiteConnector():
         job_dicts = [dict(zip(col_headers, job)) for job in job_list]
         return job_dicts
 
-
     @sqlite_db
     def sqlite_get_job(self, job_id):
         conn = self._create_connection(self._db_name)
@@ -192,14 +192,16 @@ class SQLiteConnector():
         return job_dict
 
     @sqlite_db
-    def sqlite_exec_job(self, proc_id, job_id, job_spec, backend_info):
+    def sqlite_exec_job(self, proc_id, job_id, job_spec, job_owner,
+                        backend_info):
         conn = self._create_connection(self._db_name)
         cur = conn.cursor()
         cur.execute(
-            """INSERT INTO jobs(jobID, procID, inputs, backend_info, metrics, status, timestamp)
-                    VALUES(?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO jobs(jobID, jobOwner, procID, inputs, backend_info, metrics, status, timestamp)
+                    VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 job_id,
+                job_owner,
                 proc_id,
                 json.dumps(job_spec),
                 json.dumps(backend_info),

@@ -10,14 +10,14 @@ class ADES_PBS(ADES_ABC):
 
     def __init__(self, ades_id, 
                  base_ades_home_dir='./ades', base_work_dir='./jobs',
-                 job_inputs_fname='inputs.yml', sing_stash_dir='./singularity', module_cmd='modulecmd',
-                 singularity_cmd='./bin/singularity', pbs_qsub_cmd='./bin/qsub',
-                 pbs_qdel_cmd='./bin/qdel', pbs_qstat_cmd='./bin/qstat',
-                 pbs_script_fname='pbs.bash',
-                 exit_code_fname = "exit_code.json", 
-                 cwl_runner_log_fname = "cwl_runner.log",
-                 metrics_fname = "metrics.json",
-                 pbs_script_stub = """#!/bin/bash
+                 job_inputs_fname='inputs.yml',
+                 sing_stash_dir='./singularity', module_cmd='modulecmd',
+                 singularity_cmd='./bin/singularity',
+                 pbs_qsub_cmd='./bin/qsub', pbs_qdel_cmd='./bin/qdel',
+                 pbs_qstat_cmd='./bin/qstat', pbs_script_fname='pbs.bash',
+                 exit_code_fname="exit_code.json",
+                 cwl_runner_log_fname="cwl_runner.log",
+                 metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
 #
 #PBS -q long
 #PBS -lselect=1:ncpus=1:model=bro

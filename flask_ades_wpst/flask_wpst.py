@@ -100,7 +100,8 @@ def processes_jobs(procID):
     elif request.method == 'POST':
         status_code = 201
         job_params = request.get_json()
-        job_info = ades_base.exec_job(procID, job_params)
+        req_vals = request.values
+        job_info = ades_base.exec_job(procID, job_params, req_vals)
         resp_dict = job_info
     return (ades_resp(resp_dict), 
             status_code, {'ContentType':'application/json'})
