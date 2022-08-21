@@ -113,7 +113,6 @@ class ADES_Base:
 
         # otherwise, query the ADES backend for the current status
         ades_resp = self._ades.get_job(job_spec)
-        # print(ades_resp)
         job_info["status"] = ades_resp["status"]
 
         # populate current metrics
