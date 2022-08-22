@@ -34,7 +34,7 @@ def ades_resp(d):
     '''Inject additional elements into every endpoint response.
     '''
     # Add ADES ID to the Flask endpoint return dictionary.
-    d |= { "ades-id": app.config["ADES_ID"] }
+    d |= { "ades_id": app.config["ADES_ID"] }
     return d
 
 @app.route("/", methods = ['GET'])
