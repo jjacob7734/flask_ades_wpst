@@ -8,6 +8,24 @@ from socket import getfqdn
 from datetime import datetime
 
 
+##############################################################################
+# Set the version of the JSON response API used.  This version number will
+# automatically be included as part of every JSON response.  Client codes
+# can check this version to determine what keywords and structure are
+# expected from each WPS-T endpoint.
+#
+# Recommended process for updating this API version:
+# Update this API version setting everytime the JSON structure of any
+# endpoint response is changed.  If this is in a development branch in
+# between public releases, modify the part to the right of the decimal
+# point.  In preparing for a new release, if the part to the right of the
+# decimal point is "0" (meaning no change in API since the last release),
+# then leave this  unchanged.  If the part to the right of the decimal point
+# is not "0", then increment the part to the left of the decimal point and set
+# the part to the right of the decimal point to "0".
+API_VERSION = "1.0"
+##############################################################################
+
 app = Flask(__name__)
 
 def default_ades_id():
@@ -33,8 +51,9 @@ def parse_args():
 def ades_resp(d):
     '''Inject additional elements into every endpoint response.
     '''
-    # Add ADES ID to the Flask endpoint return dictionary.
-    d |= { "ades_id": app.config["ADES_ID"] }
+    # Add additional global elements to the Flask endpoint return dictionary.
+    d |= { "ades_id": app.config["ADES_ID"],
+           "api_version": API_VERSION }
     return d
 
 @app.route("/", methods = ['GET'])
