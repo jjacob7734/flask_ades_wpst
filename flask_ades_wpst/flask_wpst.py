@@ -38,7 +38,8 @@ def default_ades_id():
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("-d", "--debug", action="store_true")
+    parser.add_argument("-d", "--debug", action="store_true",
+                        help="turn on Flask debug mode")
     parser.add_argument("-H", "--host", default="127.0.0.1",
                         help="host IP address for Flask server")
     parser.add_argument("-p", "--port", default=5000,
