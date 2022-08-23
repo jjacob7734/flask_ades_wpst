@@ -103,6 +103,7 @@ class ADES_Base:
         # dismissed, successful, or failed
         job_info = {
             "jobID": job_id,
+            "job_type": proc_id,
             "username": job_spec["jobOwner"],
             "time_queued": job_spec["timeCreated"],
             "status": job_spec["status"],
