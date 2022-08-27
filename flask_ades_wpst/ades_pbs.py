@@ -209,6 +209,8 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             print("Deleting jobID:", job_spec["jobID"])
             print("Deleting pbs_job_id:", pbs_job_id)
             print("qdel_resp:", qdel_resp)
+            job_spec["backend_info"]["status"] = "dismissed"
+            job_spec["status"] = "dismissed"
        
         # Remove the job's work directory.
         job_id = job_spec["jobID"]
