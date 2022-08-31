@@ -8,15 +8,16 @@ from pprint import pprint
 
 class ADES_PBS(ADES_ABC):
 
-    def __init__(self, base_work_dir='./jobs', job_inputs_fname='inputs.yml',
+    def __init__(self, ades_id, 
+                 base_ades_home_dir='./ades', base_work_dir='./jobs',
+                 job_inputs_fname='inputs.json',
                  sing_stash_dir='./singularity', module_cmd='modulecmd',
-                 singularity_cmd='./bin/singularity', pbs_qsub_cmd='./bin/qsub',
-                 pbs_qdel_cmd='./bin/qdel', pbs_qstat_cmd='./bin/qstat',
-                 pbs_script_fname='pbs.bash',
-                 exit_code_fname = "exit_code.json", 
-                 cwl_runner_log_fname = "cwl_runner.log",
-                 metrics_fname = "metrics.json",
-                 pbs_script_stub = """#!/bin/bash
+                 singularity_cmd='./bin/singularity',
+                 pbs_qsub_cmd='./bin/qsub', pbs_qdel_cmd='./bin/qdel',
+                 pbs_qstat_cmd='./bin/qstat', pbs_script_fname='pbs.bash',
+                 exit_code_fname="exit_code.json",
+                 cwl_runner_log_fname="cwl_runner.log",
+                 metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
 #
 #PBS -q long
 #PBS -lselect=1:ncpus=1:model=bro
@@ -31,11 +32,23 @@ cd {}
 # Run workflow
 cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
 echo {{\\"exit_code\\": $?}} > {}
-python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {} -p {}
+python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
 """):
-        self._base_work_dir = base_work_dir
+        self._ades_id = ades_id
+        self._ades_home_dir = os.path.join(base_ades_home_dir,
+                                           self._ades_id)
+        if not os.path.isdir(self._ades_home_dir):
+            os.mkdir(self._ades_home_dir)
+            print("mkdir:", self._ades_home_dir)
+        self._base_work_dir = os.path.join(self._ades_home_dir,
+                                           base_work_dir)
+        if not os.path.isdir(self._base_work_dir):
+            os.mkdir(self._base_work_dir)
         self._job_inputs_fname = job_inputs_fname
-        self._sing_stash_dir = sing_stash_dir
+        self._sing_stash_dir = os.path.join(self._ades_home_dir,
+                                            sing_stash_dir)
+        if not os.path.isdir(self._sing_stash_dir):
+            os.mkdir(self._sing_stash_dir)
         self._pbs_script_fname = pbs_script_fname
         self._module_cmd = module_cmd
         self._singularity_cmd = singularity_cmd
@@ -141,7 +154,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {} -p {}
         except:
             raise OSError("Could not create work directory {} for job {}".format(work_dir, job_id))
 
-        # Write job inputs YAML to a file in the work directory.
+        # Write job inputs to a JSON file in the work directory.
         job_inputs_fname = os.path.join(work_dir, self._job_inputs_fname)
         with open(job_inputs_fname, 'w', encoding='utf-8') as job_inputs_file:
             json.dump(job_spec['inputs'], job_inputs_file, ensure_ascii=False,
@@ -163,8 +176,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {} -p {}
                                          self._exit_code_fname,
                                          self._cwl_runner_log_fname,
                                          self._metrics_fname,
-                                         self._exit_code_fname,
-                                         self._pbs_script_fname))
+                                         self._exit_code_fname))
 
         # Submit job to queue for execution.
         qsub_resp = run([self._pbs_qsub_cmd, "-N", job_id, "-o", work_dir, 
