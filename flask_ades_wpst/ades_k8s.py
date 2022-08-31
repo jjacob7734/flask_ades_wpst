@@ -12,8 +12,9 @@ from flask_ades_wpst.ades_abc import ADES_ABC
 
 
 class ADES_K8s(ADES_ABC):
-    def __init__(self):
+    def __init__(self, ades_id):
         print(f"in ADES_K8s.__init__()")
+        self._ades_id = ades_id
 
         # detect if debugging K8s
         self.debug_k8s = os.environ.get("DEBUG_K8S", "false").lower() == "true"
@@ -406,7 +407,8 @@ class ADES_K8s(ADES_ABC):
                     0, debug_opt
                 )
 
-        # add initContainer to prep up tmpout and output-data directories
+        # add initContainer to prep up tmpout and output-data directories;
+        # dump the input params into a JSON file to support complex input params 
         k8s_job_spec["template"]["spec"]["initContainers"] = [
             {
                 "name": "init-volumes",
@@ -433,28 +435,27 @@ class ADES_K8s(ADES_ABC):
             }
         ]
 
+        # TODO: remove this once vetted
         # populate input params
-        '''
-        for k, v in job_spec["inputs"].items():
-            if v is None:
-                k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-                    f"--{k}"
-                )
-                # TODO: need better way of detecting when to use secrets; for now hard coding
-                # by looking for the string
-                if "aws_access_key_id" in k:
-                    k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-                        "$(aws_access_key_id)"
-                    )
-                elif "aws_secret_access_key" in k:
-                    k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-                        "$(aws_secret_access_key)"
-                    )
-            else:
-                k8s_job_spec["template"]["spec"]["containers"][0]["args"].extend(
-                    [f"--{k}", f"{v}"]
-                )
-        '''
+        # for k, v in job_spec["inputs"].items():
+        #     if v is None:
+        #         k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
+        #             f"--{k}"
+        #         )
+        #         # TODO: need better way of detecting when to use secrets; for now hard coding
+        #         # by looking for the string
+        #         if "aws_access_key_id" in k:
+        #             k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
+        #                 "$(aws_access_key_id)"
+        #             )
+        #         elif "aws_secret_access_key" in k:
+        #             k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
+        #                 "$(aws_secret_access_key)"
+        #             )
+        #     else:
+        #         k8s_job_spec["template"]["spec"]["containers"][0]["args"].extend(
+        #             [f"--{k}", f"{v}"]
+        #         )
 
         # create job_id and prepend to script inputs
         job_id = f"calrissian-job-{id}"
