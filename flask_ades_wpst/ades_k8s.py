@@ -12,8 +12,9 @@ from flask_ades_wpst.ades_abc import ADES_ABC
 
 
 class ADES_K8s(ADES_ABC):
-    def __init__(self):
+    def __init__(self, ades_id):
         print(f"in ADES_K8s.__init__()")
+        self._ades_id = ades_id
 
         # detect if debugging K8s
         self.debug_k8s = os.environ.get("DEBUG_K8S", "false").lower() == "true"
