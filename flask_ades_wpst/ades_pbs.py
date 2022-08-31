@@ -203,13 +203,17 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             pbs_job_id = job_spec["backend_info"]["pbs_job_id"]
             qdel_resp = run([self._pbs_qdel_cmd, "-x", "-W", "force", pbs_job_id],
                             capture_output=True, text=True)
-            print("Deleting jobID:", job_spec["jobID"])
-            print("Deleting pbs_job_id:", pbs_job_id)
+            print("Deleted jobID:", job_spec["jobID"])
+            print("Deleted pbs_job_id:", pbs_job_id)
             print("qdel_resp:", qdel_resp)
+
+            # Update job_spec status to "dismissed"
+            job_spec["backend_info"]["status"] = "dismissed"
+            job_spec["status"] = "dismissed"
        
-        # Remove the job's work directory.
-        job_id = job_spec["jobID"]
-        self._remove_workdir(job_id)
+            # Remove the job's work directory.
+            job_id = job_spec["jobID"]
+            self._remove_workdir(job_id)
             
         return job_spec
 
