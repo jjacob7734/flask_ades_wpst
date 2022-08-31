@@ -28,8 +28,7 @@ class ADES_Base:
         self._ades_id = app_config["ADES_ID"]
         self._ades = ADES_Platform(self._ades_id)
         ades_home_dir = os.path.join("./ades", self._ades_id)
-        if not os.path.isdir(ades_home_dir):
-            os.mkdir(ades_home_dir)
+        os.makedirs(ades_home_dir, exist_ok=True)
         sqlite_db_dir = os.path.join(ades_home_dir, "sqlite")
         if not os.path.isdir(sqlite_db_dir):
             os.mkdir(sqlite_db_dir)
