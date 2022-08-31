@@ -19,9 +19,9 @@ class ADES_PBS(ADES_ABC):
                  cwl_runner_log_fname="cwl_runner.log",
                  metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
 #
-#PBS -q normal
+#PBS -q debug
 #PBS -lselect=1:ncpus=1:model=bro
-#PBS -lwalltime=8:00:00
+#PBS -lwalltime=2:00:00
 #PBS -lsite=static_broadwell:nat=hfe1
 #
 # Setup
