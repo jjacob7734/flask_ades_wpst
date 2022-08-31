@@ -39,7 +39,6 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
                                            self._ades_id)
         if not os.path.isdir(self._ades_home_dir):
             os.mkdir(self._ades_home_dir)
-            print("mkdir:", self._ades_home_dir)
         self._base_work_dir = os.path.join(self._ades_home_dir,
                                            base_work_dir)
         if not os.path.isdir(self._base_work_dir):
@@ -128,7 +127,6 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
     def deploy_proc(self, proc_spec):
         container = proc_spec["executionUnit"][0]["href"]
         local_sif = self._construct_sif_name(container)
-        print("local_sif={}".format(local_sif))
         print("Localizing container {} to {}".format(container, local_sif))
         run([self._module_cmd, "bash", "load", "singularity"])
         run([self._singularity_cmd, "pull", local_sif, container])
@@ -143,7 +141,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         return proc_spec
 
     def exec_job(self, job_spec):
-        print(job_spec)
+        print("Executing:", job_spec)
 
         # Create working directory for the job with the same name as the
         # job identifier.
@@ -197,7 +195,6 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
     def dismiss_job(self, job_spec):
         # We can only dismiss jobs that were last in accepted or running state.
         status = self.get_job(job_spec)["status"]
-        print("dismiss_job got start status: ", status)
         if status in ("running", "accepted"):
             # Delete the job from the queue if it is still queued or running.
             # The "-x" option enables deleting jobs and their history in any 
