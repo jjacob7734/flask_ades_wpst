@@ -19,9 +19,9 @@ class ADES_PBS(ADES_ABC):
                  cwl_runner_log_fname="cwl_runner.log",
                  metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
 #
-#PBS -q long
+#PBS -q debug
 #PBS -lselect=1:ncpus=1:model=bro
-#PBS -lwalltime=120:00:00
+#PBS -lwalltime=2:00:00
 #PBS -lsite=static_broadwell:nat=hfe1
 #
 # Setup
@@ -39,7 +39,6 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
                                            self._ades_id)
         if not os.path.isdir(self._ades_home_dir):
             os.mkdir(self._ades_home_dir)
-            print("mkdir:", self._ades_home_dir)
         self._base_work_dir = os.path.join(self._ades_home_dir,
                                            base_work_dir)
         if not os.path.isdir(self._base_work_dir):
@@ -128,7 +127,6 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
     def deploy_proc(self, proc_spec):
         container = proc_spec["executionUnit"][0]["href"]
         local_sif = self._construct_sif_name(container)
-        print("local_sif={}".format(local_sif))
         print("Localizing container {} to {}".format(container, local_sif))
         run([self._module_cmd, "bash", "load", "singularity"])
         run([self._singularity_cmd, "pull", local_sif, container])
@@ -143,7 +141,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         return proc_spec
 
     def exec_job(self, job_spec):
-        print(job_spec)
+        print("Executing:", job_spec)
 
         # Create working directory for the job with the same name as the
         # job identifier.
@@ -197,7 +195,6 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
     def dismiss_job(self, job_spec):
         # We can only dismiss jobs that were last in accepted or running state.
         status = self.get_job(job_spec)["status"]
-        print("dismiss_job got start status: ", status)
         if status in ("running", "accepted"):
             # Delete the job from the queue if it is still queued or running.
             # The "-x" option enables deleting jobs and their history in any 
@@ -206,13 +203,17 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             pbs_job_id = job_spec["backend_info"]["pbs_job_id"]
             qdel_resp = run([self._pbs_qdel_cmd, "-x", "-W", "force", pbs_job_id],
                             capture_output=True, text=True)
-            print("Deleting jobID:", job_spec["jobID"])
-            print("Deleting pbs_job_id:", pbs_job_id)
+            print("Deleted jobID:", job_spec["jobID"])
+            print("Deleted pbs_job_id:", pbs_job_id)
             print("qdel_resp:", qdel_resp)
+
+            # Update job_spec status to "dismissed"
+            job_spec["backend_info"]["status"] = "dismissed"
+            job_spec["status"] = "dismissed"
        
-        # Remove the job's work directory.
-        job_id = job_spec["jobID"]
-        self._remove_workdir(job_id)
+            # Remove the job's work directory.
+            job_id = job_spec["jobID"]
+            self._remove_workdir(job_id)
             
         return job_spec
 
