@@ -128,6 +128,12 @@ class ADES_Base:
         now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
         # TODO: this needs to be globally unique despite underlying processing cluster
         job_id = f"{proc_id}-{hashlib.sha1((json.dumps(job_inputs, sort_keys=True) + now).encode()).hexdigest()}"
+
+        # Append the <job_id>/output to the stage-out S3 URL.
+        base_s3_url = job_inputs["stage_out"]["s3_url"]
+        job_inputs["stage_out"]["s3_url"] = os.path.join(base_s3_url,
+                                                         job_id, "output")
+
         job_owner = req_vals["user"] \
             if "user" in req_vals else self._default_user
         job_spec = {
@@ -150,11 +156,15 @@ class ADES_Base:
         return job_spec
 
     def get_job_results(self, proc_id, job_id):
-        job_spec = self.get_job(proc_id, job_id)
-        ades_resp = self._ades.get_job_results(job_spec)
+        job_spec = self._sqlite_connector.sqlite_get_job(job_id)
+        job_status = job_spec["status"]
+        if job_status == "successful":
+            links = [{"href": job_spec["inputs"]["stage_out"]["s3_url"]}]
+        else:
+            links = []
         job_info = {
             "jobID": job_id,
-            "status": ades_resp["status"],
-            "links": ades_resp["links"],
+            "status": job_status,
+            "links": links
         }
         return job_info
