@@ -294,6 +294,7 @@ class ADES_K8s(ADES_ABC):
                                 "--usage-report",
                                 f"/calrissian/output-data/{output_pvc_name}/docker-usage.json",
                                 job_spec["process"]["owsContextURL"],
+                                f"/calrissian/tmpout/{tmpout_pvc_name}/inputs.json"
                             ],
                             "volumeMounts": [
                                 {
@@ -346,7 +347,8 @@ class ADES_K8s(ADES_ABC):
                     0, debug_opt
                 )
 
-        # add initContainer to prep up tmpout and output-data directories
+        # add initContainer to prep up tmpout and output-data directories;
+        # dump the input params into a JSON file to support complex input params 
         k8s_job_spec["template"]["spec"]["initContainers"] = [
             {
                 "name": "init-volumes",
@@ -362,7 +364,9 @@ class ADES_K8s(ADES_ABC):
                     + f"chmod +t /calrissian/tmpout/{tmpout_pvc_name} && "
                     + f"mkdir -p /calrissian/output-data/{output_pvc_name} && "
                     + f"chmod 777 /calrissian/output-data/{output_pvc_name} && "
-                    + f"chmod +t /calrissian/output-data/{output_pvc_name}",
+                    + f"chmod +t /calrissian/output-data/{output_pvc_name} && "
+                    + f"cat << EOF > /calrissian/tmpout/{tmpout_pvc_name}/inputs.json\n"
+                    + f"{json.dumps(job_spec['inputs'], indent=2)}\nEOF"
                 ],
                 "volumeMounts": [
                     {"mountPath": "/calrissian/tmpout", "name": tmpout_pvc_name,},
@@ -370,27 +374,6 @@ class ADES_K8s(ADES_ABC):
                 ],
             }
         ]
-
-        # populate input params
-        for k, v in job_spec["inputs"].items():
-            if v is None:
-                k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-                    f"--{k}"
-                )
-                # TODO: need better way of detecting when to use secrets; for now hard coding
-                # by looking for the string
-                if "aws_access_key_id" in k:
-                    k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-                        "$(aws_access_key_id)"
-                    )
-                elif "aws_secret_access_key" in k:
-                    k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-                        "$(aws_secret_access_key)"
-                    )
-            else:
-                k8s_job_spec["template"]["spec"]["containers"][0]["args"].extend(
-                    [f"--{k}", f"{v}"]
-                )
 
         # create job_id and prepend to script inputs
         job_id = f"calrissian-job-{id}"
