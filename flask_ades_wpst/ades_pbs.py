@@ -241,8 +241,4 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         return job_spec
 
     def get_job_results(self, job_spec):
-        res =  {"links": [{"href": "https://mypath",
-                           "rel": "result",
-                           "type": "application/json",
-                           "title": "mytitle"}]}
-        return {**job_spec, **res}
+        return {}

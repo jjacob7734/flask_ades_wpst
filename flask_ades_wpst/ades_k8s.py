@@ -613,14 +613,4 @@ class ADES_K8s(ADES_ABC):
         return job_spec
 
     def get_job_results(self, job_spec):
-        res = {
-            "links": [
-                {
-                    "href": "https://mypath",
-                    "rel": "result",
-                    "type": "application/json",
-                    "title": "mytitle",
-                }
-            ]
-        }
-        return {**job_spec, **res}
+        return {}
