@@ -497,7 +497,6 @@ class ADES_K8s(ADES_ABC):
         if len(usage_stats) > 0:
             metrics = {
                 "username": job_spec["jobOwner"],
-                "ades_id": self._ades_id,
                 "job_id": job_spec["jobID"],
                 "job_type": job_spec["procID"],
                 "job_status": job_spec["status"],
