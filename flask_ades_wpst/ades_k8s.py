@@ -435,28 +435,6 @@ class ADES_K8s(ADES_ABC):
             }
         ]
 
-        # TODO: remove this once vetted
-        # populate input params
-        # for k, v in job_spec["inputs"].items():
-        #     if v is None:
-        #         k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-        #             f"--{k}"
-        #         )
-        #         # TODO: need better way of detecting when to use secrets; for now hard coding
-        #         # by looking for the string
-        #         if "aws_access_key_id" in k:
-        #             k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-        #                 "$(aws_access_key_id)"
-        #             )
-        #         elif "aws_secret_access_key" in k:
-        #             k8s_job_spec["template"]["spec"]["containers"][0]["args"].append(
-        #                 "$(aws_secret_access_key)"
-        #             )
-        #     else:
-        #         k8s_job_spec["template"]["spec"]["containers"][0]["args"].extend(
-        #             [f"--{k}", f"{v}"]
-        #         )
-
         # create job_id and prepend to script inputs
         job_id = f"calrissian-job-{id}"
         k8s_job_spec["template"]["spec"]["containers"][0]["args"].insert(0, job_id)
@@ -578,33 +556,97 @@ class ADES_K8s(ADES_ABC):
         # collect metrics from usage stats
         if len(usage_stats) > 0:
             metrics = {
+                "username": job_spec["jobOwner"],
+                "job_id": job_spec["jobID"],
+                "job_type": job_spec["procID"],
+                "job_status": job_spec["status"],
                 "workflow": {
-                    "exit_code": 0 if job_spec["status"] == "successful" else 1,
                     "time_queued": job_info_sanitized["status"]["startTime"],
-                    "time_started": usage_stats["start_time"],
+                    "time_start": usage_stats["start_time"],
                     "time_end": usage_stats["finish_time"],
-                },
-                "processes": [
-                    {
-                        "name": child["name"],
-                        "time_started": child["start_time"],
-                        "time_end": child["finish_time"],
-                        "work_dir_size_gb": child["disk_megabytes"] / 1024.0,
-                        "memory_max_gb": child["ram_megabytes"] / 1024.0,
-                        "node": {
-                            "cores": child["cpus"],
-                            "memory_gb": "unknown",
-                            "hostname": pod_info_dict[
-                                f"{child['name'].replace('_', '-')}-container"
-                            ]["status"]["podIP"],
-                            "ip_address": pod_info_dict[
-                                f"{child['name'].replace('_', '-')}-container"
-                            ]["status"]["podIP"],
-                            "disk_space_free_gb": "unknown",
-                        },
+                    "time_duration_seconds": usage_stats["elapsed_seconds"],
+                    "work_dir_size_gb": usage_stats["total_disk_megabytes"]/1024.,
+                    "memory_max_gb": usage_stats["max_parallel_ram_megabytes"]/1024.,
+                    "exit_code": 0 if job_spec["status"] == "successful" else 1,
+                    "node": {
+                        "node_type": "unknown",
+                        "cores": usage_stats["cores_allowed"],
+                        "memory_gb": usage_stats["ram_mb_allowed"]/1024.,
+                        "hostname": "unknown",
+                        "ip_address": "unknown",
+                        "disk_space_free_gb": "unknown",
                     }
-                    for child in usage_stats["children"]
-                ],
+                },
+                # TODO: delete this original implementation that handled processes generically
+                # "processes": [
+                #     {
+                #         "name": child["name"],
+                #         "time_started": child["start_time"],
+                #         "time_end": child["finish_time"],
+                #         "work_dir_size_gb": child["disk_megabytes"] / 1024.0,
+                #         "memory_max_gb": child["ram_megabytes"] / 1024.0,
+                #         "node": {
+                #             "cores": child["cpus"],
+                #             "memory_gb": "unknown",
+                #             "hostname": pod_info_dict[
+                #                 f"{child['name'].replace('_', '-')}-container"
+                #             ]["status"]["podIP"],
+                #             "ip_address": pod_info_dict[
+                #                 f"{child['name'].replace('_', '-')}-container"
+                #             ]["status"]["podIP"],
+                #             "disk_space_free_gb": "unknown",
+                #         },
+                #     }
+                #     for child in usage_stats["children"]
+                # ],
+                "stage-in": {
+                    "time_start": usage_stats["children"][0]["start_time"],
+                    "time_end": usage_stats["children"][0]["finish_time"],
+                    "time_duration_seconds": usage_stats["children"][0]["elapsed_seconds"],
+                    "work_dir_size_gb": usage_stats["children"][0]["disk_megabytes"]/1024.,
+                    "memory_max_gb": usage_stats["children"][0]["ram_megabytes"]/1024.,
+                    "exit_code": 0 if job_spec["status"] == "successful" else 1,
+                    "node": {
+                        "node_type": "unknown",
+                        "cores": usage_stats["children"][0]["cpus"],
+                        "memory_gb": "unknown",
+                        "hostname": "unknown",
+                        "ip_address": "unknown",
+                        "disk_space_free_gb": "unknown",
+                    }
+                },
+                "process": {
+                    "time_start": usage_stats["children"][1]["start_time"],
+                    "time_end": usage_stats["children"][1]["finish_time"],
+                    "time_duration_seconds": usage_stats["children"][1]["elapsed_seconds"],
+                    "work_dir_size_gb": usage_stats["children"][1]["disk_megabytes"]/1024.,
+                    "memory_max_gb": usage_stats["children"][1]["ram_megabytes"]/1024.,
+                    "exit_code": 0 if job_spec["status"] == "successful" else 1,
+                    "node": {
+                        "node_type": "unknown",
+                        "cores": usage_stats["children"][1]["cpus"],
+                        "memory_gb": "unknown",
+                        "hostname": "unknown",
+                        "ip_address": "unknown",
+                        "disk_space_free_gb": "unknown",
+                    }
+                },
+                "stage-out": {
+                    "time_start": usage_stats["children"][2]["start_time"],
+                    "time_end": usage_stats["children"][2]["finish_time"],
+                    "time_duration_seconds": usage_stats["children"][2]["elapsed_seconds"],
+                    "work_dir_size_gb": usage_stats["children"][2]["disk_megabytes"]/1024.,
+                    "memory_max_gb": usage_stats["children"][2]["ram_megabytes"]/1024.,
+                    "exit_code": 0 if job_spec["status"] == "successful" else 1,
+                    "node": {
+                        "node_type": "unknown",
+                        "cores": usage_stats["children"][2]["cpus"],
+                        "memory_gb": "unknown",
+                        "hostname": "unknown",
+                        "ip_address": "unknown",
+                        "disk_space_free_gb": "unknown",
+                    }
+                },
                 "blob": usage_stats,
             }
             job_spec["metrics"] = metrics
