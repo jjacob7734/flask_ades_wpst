@@ -21,10 +21,20 @@ class ADES_PBS(ADES_ABC):
                  singularity_cmd='./bin/singularity',
                  pbs_qsub_cmd='./bin/qsub', pbs_qdel_cmd='./bin/qdel',
                  pbs_qstat_cmd='./bin/qstat', pbs_script_fname='pbs.bash',
-                 pbs_qname=None, exit_code_fname="exit_code.json",
+                 pbs_qname=None, pbs_qname_cache=None,
+                 cache_cwl_fname="cache_workflow.cwl",
+                 exit_code_fname="exit_code.json",
                  cwl_runner_log_fname="cwl_runner.log",
                  metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
 #
+############################################################################
+# Preprocessing: run input data caching workflow
+############################################################################
+#PBSPRE -q {} cwl-runner {} {}
+#
+############################################################################
+# Process workflow CWL
+############################################################################
 #PBS -q {}
 #PBS -lsite=nat=hfe1
 #PBS -lselect=1:ncpus=1:mem=1gb:model=bro
@@ -68,6 +78,18 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         else:
             # Get name of PBS queue to use from the parameter setting.
             self._pbs_qname = pbs_qname
+        if pbs_qname_cache is None:
+            # Get name of PBS queue to use for the input data caching step
+            # from the environment. Use the same queue as the regular
+            # workflow as a default if it is not set.
+            self._pbs_qname_cache = os.environ.get("ADES_PBS_QUEUE_CACHE",
+                                                   default=self._pbs_qname)
+        else:
+            # Get name of PBS queue to use for the input data caching step
+            # from the parameter setting.
+            self._pbs_qname_cache = pbs_qname_cache
+        self._pbs_qname_cache_step = self._pbs_qname
+        self._cache_cwl_fname = cache_cwl_fname
         self._exit_code_fname = exit_code_fname
         self._cwl_runner_log_fname = cwl_runner_log_fname
         self._metrics_fname = metrics_fname
@@ -83,6 +105,10 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
     def _construct_pbs_job_id_from_qsub_stdout(self, qsub_stdout):
         return '.'.join(qsub_stdout.strip().split('.')[:2])
         
+    def _construct_cache_cwl_url(self, workflow_cwl_url):
+        return os.path.join(os.path.dirname(workflow_cwl_url),
+                            self._cache_cwl_fname)
+
     def _validate_workdir(self, work_dir):
         if (os.path.isdir(work_dir) and
             os.path.isfile(os.path.join(work_dir, self._pbs_script_fname))):
@@ -166,6 +192,9 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         except:
             raise OSError("Could not create work directory {} for job {}".format(work_dir, job_id))
 
+        # TO DO: Inject location of cache directory as an additional
+        # workflow input.
+
         # Write job inputs to a JSON file in the work directory.
         job_inputs_fname = os.path.join(work_dir, self._job_inputs_fname)
         with open(job_inputs_fname, 'w', encoding='utf-8') as job_inputs_file:
@@ -174,16 +203,19 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
 
         # Create PBS script in the work directory.
         pbs_script_fname = os.path.join(work_dir, self._pbs_script_fname)
+        workflow_cwl_url = job_spec['process']['owsContextURL']
+        cache_cwl_url = self._construct_cache_cwl_url(workflow_cwl_url)
         with open(pbs_script_fname, 'w') as pbs_script_file:
             # The second format string below is the cwl-runner's tmpdir-prefix,
             # which we set to the same as the work directory.  The os.path.join
             # with '' is a trick to ensure that the trailing slash is included
             # in the path.
             pbs_script_file.write(self._pbs_script_stub.\
-                                  format(self._pbs_qname, work_dir,
+                                  format(self._pbs_qname_cache,
+                                         cache_cwl_url, job_inputs_fname,
+                                         self._pbs_qname, work_dir,
                                          os.path.join(work_dir, ''),
-                                         job_spec['process']['owsContextURL'],
-                                         job_inputs_fname,
+                                         workflow_cwl_url, job_inputs_fname,
                                          self._cwl_runner_log_fname,
                                          self._exit_code_fname,
                                          self._cwl_runner_log_fname,
@@ -203,7 +235,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         else:
             pbs_job_id = 'none'
             status = 'failed'
-            
+
         return {'pbs_job_id': pbs_job_id, 'status': status, 'error': error}
 
     def dismiss_job(self, job_spec):
