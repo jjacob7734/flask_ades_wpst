@@ -23,7 +23,8 @@ class ADES_PBS(ADES_ABC):
                  pbs_qstat_cmd='./bin/qstat', pbs_script_fname='pbs.bash',
                  pbs_qname=None, pbs_qname_cache=None,
                  cache_cwl_fname="cache_workflow.cwl", cache_dir="./cache",
-                 exit_code_fname="exit_code.json",
+                 exit_code_fname="exit_code.json", ltak_relpath="../../.aws",
+                 default_stageout_bucket=None,
                  cwl_runner_log_fname="cwl_runner.log",
                  metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
 #
@@ -107,6 +108,17 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             os.path.splitext(cwl_runner_log_fname)[0] + "_cache.log"
         self._metrics_fname = metrics_fname
         self._pbs_script_stub = pbs_script_stub
+        if default_stageout_bucket is None:
+            # Get default stage-out bucket from the environment.
+            self._default_stageout_bucket = \
+                os.environ.get("ADES_DEFAULT_BUCKET_STAGEOUT", default="")
+        else:
+            self._default_stageout_bucket = default_stageout_bucket
+        self._default_stageout_url = \
+            os.path.join("s3://", self._default_stageout_bucket, self._ades_id)
+        self._ltak_relpath = ltak_relpath
+        self._aws_config = { "class": "Directory",
+                            "path": self._ltak_relpath }
 
     def _construct_sif_name(self, docker_url):
         sif_name = os.path.basename(docker_url).replace(':', '_') + ".sif"
@@ -218,8 +230,21 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         # Write job inputs to a JSON file in the work directory.
         job_inputs_fname = os.path.join(work_dir, self._job_inputs_fname)
         job_inputs = job_spec["inputs"]
+
+        # Inject cache directory location into job inputs.
         job_inputs["cache_dir"] = {"class": "Directory",
                                    "path": self._cache_dir}
+
+        # If stage_out information is not provided, inject it automatically
+        # assuming a default S3 bucket and LTAK.
+        if "stage_out" not in job_inputs:
+            job_inputs["stage_out"] = \
+                { "s3_url": os.path.join(self._default_stageout_url,
+                                         job_id, "output"),
+                  "aws_config": self._aws_config }
+        elif "aws_config" not in job_inputs["stage_out"]:
+            job_inputs["stage_out"]["aws_config"] = self._aws_config
+
         with open(job_inputs_fname, 'w', encoding='utf-8') as job_inputs_file:
             json.dump(job_spec['inputs'], job_inputs_file, ensure_ascii=False,
                       indent=4)
