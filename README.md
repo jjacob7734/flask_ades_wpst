@@ -1,67 +1,141 @@
 # Description
-Stub flask app that implements a subset of the OGC ADES/WPST specification.
 
-# Get started
-Clone the repo and create a subdirectory for the SQLite database file.
+Flask app that implements a subset of the OGC ADES/WPST specification.	
+Includes platform-specific implementations for Kubernetes and High End	
+Computing (HEC) environments.
 
-    git clone https://github.jpl.nasa.gov/SOAMC/flask_ades_wpst.git
-    cd flask_ades_wpst
-    mkdir sqlite
+# Installation
 
-# Install it natively (not in a container) as a python module
-Be sure to follow the steps in the "Get started" section above first.  Install
-natively as a python module with:
+Clone the repo and run the following in the top directory of the repo:
 
     python setup.py install
 
-The `Flask` python module is required for installation.
+# Configuration
 
-# Run it natively (not in a container)
-Be sure to follow the steps in the "Get started" section above first.
+The following environment variables can be used to configure the application.
+
+## General settings
+
+These settings apply to all platforms.
+
+| Variable Name | Description |
+| ------------- | ----------- |
+| `ADES_HOME` | Top level base directory for all files written by the app. |
+| `ADES_PLATFORM` | Platform being run.  Can be set to `PBS` or `K8s` to activate the PBS (on high end computing systems like NASA Pleiades) or Kubernetes implementations, respectively.  Defaults to `Generic`, which does no extra platform specific actions. |
+
+## PBS (High End Computing) Configuration
+
+These settings apply to the PBS (High End Computing) platform only.
+
+| Variable Name | Description |
+| ------------- | ----------- |
+| `ADES_PBS_QUEUE` | Queue name to use to submit jobs |
+| `ADES_PBS_QUEUE_CACHE` | Queue name to use for handling of PBS preprocessing directives like data caching. Defaults to same queue as in `ADES_PBS_QUEUE` setting. |
+
+# Usage
 Run the Flask app server with:
 
-    python -m flask_ades_wpst.flask_wpst
+    python -m flask_ades_wpst.flask_wpst <options>
 
-# Run it as a Docker container
-Be sure to follow the steps in the "Get started" section above first.
-To run as a Docker container, but sure to do the following in the `docker run`
-command as shown in the example below:
+## Optional Arguments
 
-1. Map the Flask application server port to the host port (`-p` option)
-1. Mount your `sqlite` subdirectory on the host machine in to the container
-(`-v` option)
-1. Set the `ADES_PLATFORM` environment variable to a supported environment
-(e.g., `K8s`, `PBS`, `Generic`) (`-v` option).  If no environment variable
-is set, the default is `Generic`, which results in no additional actions
-being done on the host.
+    -h, --help            show this help message and exit
+    -d, --debug           turn on Flask debug mode
+    -H HOST, --host HOST  host IP address for Flask server
+    -p PORT, --port PORT  host port number for Flask server
+    -n NAME, --name NAME  ID of this ADES instance
 
-# Run with Docker: 
+## Running Multiple Instances
 
-In the following, set the `ADES_PLATFORM` environment variable to the
-appropriate setting for your platform (examples: K8s, PBS)
+If you want to run multiple instances of this application, be sure to give
+each instance a unique name/ID and port number to listen on.
 
-    docker run -it -p 5000:5000 -v ${PWD}/sqlite:/flask_ades_wpst/sqlite -e "ADES_PLATFORM=<platform>" <org>/flask-ades-wpst:<tag>
-
-# Build the container locally
-Be sure to follow the steps in the "Get started" section above first.
-If you run the Docker container as shown above, you will automatically download
-the latest container version from Docker Hub.  If you like, you can also build
-your own local container as follows:
-
-    docker build -t <org>/flask-ades-wpst:<tag> -f docker/Dockerfile .
-    
 # Try out the OGC ADES/WPS-T endpoints
-You can see the available endpoints by starting with the root endpoint and inspecting the links returned:
+You can see the available endpoints by starting with the root landing page
+and inspecting the links returned:
+
+## `getLandingPage`
+
+Get a landing page showing the available endpoints.
 
     curl http://127.0.0.1:5000/
+
+## `getProcesses`
+
+Get a list of deployed processes.
+
+    curl http://127.0.0.1:5000/processes
+
+## `deployProcess`
+
+To deploy a process use an HTTP `POST` with a `proc` parameter specifying the
+URL of the application descriptor JSON file.  If this file is hosted on
+Github, but sure to get the raw URL by clicking on the Raw button on the
+page.
+
+    curl -X POST http://127.0.0.1:5000/processes?proc=https://raw.githubusercontent.com/path/to/application-descriptor.json
+
+## `getProcess`
+
+Get information about a deployed process.  First get the process ID by
+either inspecting the JSON returned from either `deployProcess` or
+`getProcesses`.  Use that process ID in the URL as follows:
+
+    curl http://127.0.0.1:5000/processes/<process-id>
+
+## `undeployProcess`
+
+Undeploy a process.  First get the process ID by inspecting the JSON returned
+from either `deployProcess` or `getProcesses`.  Use that process ID in an HTTP
+`DELETE` URL as follows:
+
+    curl -X DELETE http://127.0.0.1:5000/processes/<process-id>
+   
+## `getJobList`
+
+Get a list of jobs for a process (job type).
+
+    curl http://127.0.0.1:5000/processes/<process-id>/jobs
+
+## `executeJob`
+
+To run a job, use an HTTP `POST` with the input values for the job specified in
+the payload dictionary as indicated below.
+
+    curl -H "Content-Type: application/json" -X POST -d '{<input-values-dictionary>}' http://127.0.0.1:5000/processes/<process-id>/jobs
+
+## `getJobStatus`
+
+Get status of a submitted job. First get the job ID by inspecting the JSON
+returned from either `executeJob` or `getJobList`.   Use the job ID in the URL
+as follows:
+
+    curl http://127.0.0.1:5000/processes/<process-id>/jobs/<job-id>
+
+## `dismissJob`
+
+Dismiss a submitted job. First get the job ID by inspecting the JSON returned
+from either `executeJob` or `getJobList`.   Use the job ID in and HTTP `DELETE`
+URL as follows:
+
+    curl -X DELETE http://127.0.0.1:5000/processes/<process-id>/jobs/<job-id>
+
+Only jobs that have not yet completed can be dismissed.
+
+## `getJobResults`
+
+Once a job completes successfully (as indicted by `getJobStatus`), you can get
+the URLs of the job results as follows:
+
+    curl http://127.0.0.1:5000/processes/<process-id>/jobs/<job-id>/result
 
 # Notes
 1. This is a partial implementation of the OGC ADES/WPS-T specification:
 http://docs.opengeospatial.org/per/18-050r1.html#_wps_t_restjson
 1. The `deployProcess` `POST` requires a `proc` keyword with value
-equal to the application descriptor JSON URL. The process ID must be
-specified in that application descriptor JSON.
-1. The `executeJob` `POST` requires a `job` keyword with value equal
-to the job CWL URL.
-1. You can get the above URLs by navigating to the file on github.com
-and clicking on "Raw".
+equal to the application descriptor JSON URL. If stored on Github, you must 
+specify the raw URL, which you can get by navigating to the file and 
+clicking on "Raw".   The process ID must be specified in that application
+descriptor JSON.
+1. The `executeJob` `POST` requires a dictionary payload with the required
+job input values.
