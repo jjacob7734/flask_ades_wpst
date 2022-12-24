@@ -91,8 +91,8 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             self._pbs_qname_cache = pbs_qname_cache
         self._pbs_qname_cache_step = self._pbs_qname
         self._cache_cwl_fname = cache_cwl_fname
-        self._cache_dir = os.path.abspath(os.path.join(base_ades_home_dir,
-                                                       cache_dir))
+        self._cache_dir = os.path.realpath(os.path.join(base_ades_home_dir,
+                                                        cache_dir))
         self._exit_code_fname = exit_code_fname
         self._cwl_runner_log_fname = cwl_runner_log_fname
         self._cwl_runner_cache_log_fname = \
@@ -105,7 +105,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         return os.path.join(self._sing_stash_dir, sif_name)
 
     def _construct_workdir(self, job_id):
-        return os.path.abspath(os.path.join(self._base_work_dir, job_id))
+        return os.path.realpath(os.path.join(self._base_work_dir, job_id))
 
     def _construct_pbs_job_id_from_qsub_stdout(self, qsub_stdout):
         return '.'.join(qsub_stdout.strip().split('.')[:2])
@@ -117,10 +117,10 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
     def _validate_workdir(self, work_dir):
         if (os.path.isdir(work_dir) and
             os.path.isfile(os.path.join(work_dir, self._pbs_script_fname))):
-            work_dir_abspath = os.path.abspath(work_dir)
-            base_work_dir_abspath = os.path.abspath(self._base_work_dir)
-            return (len(work_dir_abspath) > len(base_work_dir_abspath) and 
-                    work_dir_abspath.startswith(base_work_dir_abspath))
+            work_dir_realpath = os.path.realpath(work_dir)
+            base_work_dir_realpath = os.path.realpath(self._base_work_dir)
+            return (len(work_dir_realpath) > len(base_work_dir_realpath) and
+                    work_dir_realpath.startswith(base_work_dir_realpath))
         else:
             return False
 
