@@ -22,7 +22,7 @@ class ADES_PBS(ADES_ABC):
                  pbs_qsub_cmd='./bin/qsub', pbs_qdel_cmd='./bin/qdel',
                  pbs_qstat_cmd='./bin/qstat', pbs_script_fname='pbs.bash',
                  pbs_qname=None, pbs_qname_cache=None,
-                 cache_cwl_fname="cache_workflow.cwl",
+                 cache_cwl_fname="cache_workflow.cwl", cache_dir="./cache",
                  exit_code_fname="exit_code.json",
                  cwl_runner_log_fname="cwl_runner.log",
                  metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
@@ -30,7 +30,8 @@ class ADES_PBS(ADES_ABC):
 ############################################################################
 # Preprocessing: run input data caching workflow
 ############################################################################
-#PBSPRE -q {} cwl-runner {} {}
+#PBS -lsite=testcache
+#PREPBS -q {} module load singularity ; . $HOME/.venv/ades/bin/activate ; cd {} ; cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
 #
 ############################################################################
 # Process workflow CWL
@@ -90,8 +91,12 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             self._pbs_qname_cache = pbs_qname_cache
         self._pbs_qname_cache_step = self._pbs_qname
         self._cache_cwl_fname = cache_cwl_fname
+        self._cache_dir = os.path.abspath(os.path.join(base_ades_home_dir,
+                                                       cache_dir))
         self._exit_code_fname = exit_code_fname
         self._cwl_runner_log_fname = cwl_runner_log_fname
+        self._cwl_runner_cache_log_fname = \
+            os.path.splitext(cwl_runner_log_fname)[0] + "_cache.log"
         self._metrics_fname = metrics_fname
         self._pbs_script_stub = pbs_script_stub
 
@@ -192,11 +197,11 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         except:
             raise OSError("Could not create work directory {} for job {}".format(work_dir, job_id))
 
-        # TO DO: Inject location of cache directory as an additional
-        # workflow input.
-
         # Write job inputs to a JSON file in the work directory.
         job_inputs_fname = os.path.join(work_dir, self._job_inputs_fname)
+        job_inputs = job_spec["inputs"]
+        job_inputs["cache_dir"] = {"class": "Directory",
+                                   "path": self._cache_dir}
         with open(job_inputs_fname, 'w', encoding='utf-8') as job_inputs_file:
             json.dump(job_spec['inputs'], job_inputs_file, ensure_ascii=False,
                       indent=4)
@@ -211,8 +216,10 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             # with '' is a trick to ensure that the trailing slash is included
             # in the path.
             pbs_script_file.write(self._pbs_script_stub.\
-                                  format(self._pbs_qname_cache,
-                                         cache_cwl_url, job_inputs_fname,
+                                  format(self._pbs_qname_cache, work_dir,
+                                         work_dir, cache_cwl_url,
+                                         job_inputs_fname,
+                                         self._cwl_runner_cache_log_fname,
                                          self._pbs_qname, work_dir,
                                          os.path.join(work_dir, ''),
                                          workflow_cwl_url, job_inputs_fname,
