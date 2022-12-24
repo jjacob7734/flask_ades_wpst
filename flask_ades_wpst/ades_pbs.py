@@ -130,8 +130,14 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             shutil.rmtree(work_dir)
 
     def _pbs_job_state_to_status_str(self, work_dir, job_state):
+        # Typical sequence:
+        # Job begins in the Q/queued state.
+        # Job enters H/held state when preprocessing/caching directive is run
+        # Job enters R/running state when main workflow is run
+        # Job enters E/exiting state before completing
         pbs_job_state_to_status = {
             "Q": "accepted",
+            "H": "accepted",
             "R": "running",
             "E": "running",
         }
