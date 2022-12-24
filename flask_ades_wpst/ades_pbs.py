@@ -15,7 +15,7 @@ class ADES_PBS(ADES_ABC):
 # that use the PBS scheduler and Singularity container platform.
 #
     def __init__(self, ades_id, 
-                 base_ades_home_dir='./ades', base_work_dir='./jobs',
+                 base_ades_home_dir=None, base_work_dir='./jobs',
                  job_inputs_fname='inputs.json',
                  sing_stash_dir='./singularity', module_cmd='modulecmd',
                  singularity_cmd='./bin/singularity',
@@ -52,7 +52,15 @@ echo {{\\"exit_code\\": $?}} > {}
 python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
 """):
         self._ades_id = ades_id
-        self._ades_home_dir = os.path.join(base_ades_home_dir,
+        if base_ades_home_dir is None:
+            # Get ADES base home directory from the environment, or use a
+            # default if it is not set.
+            self._base_ades_home_dir = os.environ.get("ADES_HOME",
+                                                      default="./ades")
+        else:
+            # Get ADES base home directory from the parameter setting.
+            self._base_ades_home_dir = base_ades_home_dir
+        self._ades_home_dir = os.path.join(self._base_ades_home_dir,
                                            self._ades_id)
         if not os.path.isdir(self._ades_home_dir):
             os.mkdir(self._ades_home_dir)
@@ -91,8 +99,8 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             self._pbs_qname_cache = pbs_qname_cache
         self._pbs_qname_cache_step = self._pbs_qname
         self._cache_cwl_fname = cache_cwl_fname
-        self._cache_dir = os.path.realpath(os.path.join(base_ades_home_dir,
-                                                        cache_dir))
+        self._cache_dir = \
+            os.path.realpath(os.path.join(self._base_ades_home_dir, cache_dir))
         self._exit_code_fname = exit_code_fname
         self._cwl_runner_log_fname = cwl_runner_log_fname
         self._cwl_runner_cache_log_fname = \

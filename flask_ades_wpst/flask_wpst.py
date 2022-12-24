@@ -221,6 +221,13 @@ def flask_wpst(app, ades_id, debug=DEFAULT_FLASK_DEBUG,
         ades_id = default_ades_id()
     app.config["ADES_ID"] = ades_id
 
+    # Get the ADES home directory from the environment and ensure it exists
+    ades_home = os.environ.get("ADES_HOME", default="./ades")
+    if not os.path.exists(ades_home):
+        raise OSError("ADES_HOME path {} does not exist.".\
+                         format(ades_home))
+    app.config["ADES_HOME"] = ades_home
+
     # Get the platform setting (e.g., PBS, K8s) from the environment and
     # validate it..
     platform = os.environ.get("ADES_PLATFORM", default="Generic")

@@ -25,9 +25,10 @@ class ADES_Base:
             raise ValueError("Platform {} not implemented.".
                              format(self._platform))
         self._default_user = "anonymous"
+        self._base_ades_home_dir = app_config["ADES_HOME"]
         self._ades_id = app_config["ADES_ID"]
         self._ades = ADES_Platform(self._ades_id)
-        ades_home_dir = os.path.join("./ades", self._ades_id)
+        ades_home_dir = os.path.join(self._base_ades_home_dir, self._ades_id)
         os.makedirs(ades_home_dir, exist_ok=True)
         sqlite_db_dir = os.path.join(ades_home_dir, "sqlite")
         if not os.path.isdir(sqlite_db_dir):
