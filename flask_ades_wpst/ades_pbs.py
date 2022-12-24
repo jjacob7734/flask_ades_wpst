@@ -31,7 +31,7 @@ class ADES_PBS(ADES_ABC):
 # Preprocessing: run input data caching workflow
 ############################################################################
 #PBS -lsite=testcache
-#PREPBS -q {} module load singularity ; . $HOME/.venv/ades/bin/activate ; cd {} ; cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
+#PREPBS -q {} cd {} ; module load singularity ; . $HOME/.venv/ades/bin/activate ; cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
 #
 ############################################################################
 # Process workflow CWL
@@ -42,9 +42,9 @@ class ADES_PBS(ADES_ABC):
 #PBS -lwalltime=2:00:00
 #
 # Setup
+cd {}
 module load singularity
 . $HOME/.venv/ades/bin/activate
-cd {}
 #
 # Run workflow
 cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
@@ -105,7 +105,11 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         return os.path.join(self._sing_stash_dir, sif_name)
 
     def _construct_workdir(self, job_id):
-        return os.path.realpath(os.path.join(self._base_work_dir, job_id))
+        # The outer os.path.join with the empty string ensures that 
+        # the returned path has a trailing '/'.  That seemed to be necessary 
+        # for the cwl-runner --tmpdir-prefix option.
+        return os.path.join(os.path.realpath(os.path.join(self._base_work_dir,
+                                                          job_id)), '')
 
     def _construct_pbs_job_id_from_qsub_stdout(self, qsub_stdout):
         return '.'.join(qsub_stdout.strip().split('.')[:2])
@@ -217,17 +221,13 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         workflow_cwl_url = job_spec['process']['owsContextURL']
         cache_cwl_url = self._construct_cache_cwl_url(workflow_cwl_url)
         with open(pbs_script_fname, 'w') as pbs_script_file:
-            # The second format string below is the cwl-runner's tmpdir-prefix,
-            # which we set to the same as the work directory.  The os.path.join
-            # with '' is a trick to ensure that the trailing slash is included
-            # in the path.
             pbs_script_file.write(self._pbs_script_stub.\
                                   format(self._pbs_qname_cache, work_dir,
                                          work_dir, cache_cwl_url,
                                          job_inputs_fname,
                                          self._cwl_runner_cache_log_fname,
-                                         self._pbs_qname, work_dir,
-                                         os.path.join(work_dir, ''),
+                                         self._pbs_qname,
+                                         work_dir, work_dir,
                                          workflow_cwl_url, job_inputs_fname,
                                          self._cwl_runner_log_fname,
                                          self._exit_code_fname,
