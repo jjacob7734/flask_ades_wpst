@@ -31,6 +31,7 @@ These settings apply to the PBS (High End Computing) platform only.
 | ------------- | ----------- |
 | `ADES_PBS_QUEUE` | Queue name to use to submit jobs |
 | `ADES_PBS_QUEUE_CACHE` | Queue name to use for handling of PBS preprocessing directives like data caching. Defaults to same queue as in `ADES_PBS_QUEUE` setting. |
+| `ADES_DEFAULT_BUCKET_STAGEOUT` | Default bucket to use for stage-out.  | 
 
 # Usage
 Run the Flask app server with:
