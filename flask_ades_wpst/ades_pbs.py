@@ -7,27 +7,45 @@ from pprint import pprint
 
 
 class ADES_PBS(ADES_ABC):
-
+#
+# WPS-T implementation for the High End Computing (HEC) environment with
+# the Portable Batch System (PBS) scheduler and Singularity containers.
+# This has been designed for and tested on only on NASA's Pleiades
+# supercomputer, but may be portable to other compatible HEC environments
+# that use the PBS scheduler and Singularity container platform.
+#
     def __init__(self, ades_id, 
-                 base_ades_home_dir='./ades', base_work_dir='./jobs',
+                 base_ades_home_dir=None, base_work_dir='./jobs',
                  job_inputs_fname='inputs.json',
                  sing_stash_dir='./singularity', module_cmd='modulecmd',
                  singularity_cmd='./bin/singularity',
                  pbs_qsub_cmd='./bin/qsub', pbs_qdel_cmd='./bin/qdel',
                  pbs_qstat_cmd='./bin/qstat', pbs_script_fname='pbs.bash',
-                 exit_code_fname="exit_code.json",
+                 pbs_qname=None, pbs_qname_cache=None,
+                 cache_cwl_fname="cache_workflow.cwl", cache_dir="./cache",
+                 exit_code_fname="exit_code.json", ltak_relpath="../../.aws",
+                 default_stageout_bucket=None,
                  cwl_runner_log_fname="cwl_runner.log",
                  metrics_fname="metrics.json", pbs_script_stub="""#!/bin/bash
 #
-#PBS -q debug
-#PBS -lselect=1:ncpus=1:model=bro
+############################################################################
+# Preprocessing: run input data caching workflow
+############################################################################
+#PBS -lsite=testcache
+#PREPBS -q {} cd {} ; module load singularity ; . $HOME/.venv/ades/bin/activate ; cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
+#
+############################################################################
+# Process workflow CWL
+############################################################################
+#PBS -q {}
+#PBS -lsite=nat=hfe1
+#PBS -lselect=1:ncpus=1:mem=1gb:model=bro
 #PBS -lwalltime=2:00:00
-#PBS -lsite=static_broadwell:nat=hfe1
 #
 # Setup
+cd {}
 module load singularity
 . $HOME/.venv/ades/bin/activate
-cd {}
 #
 # Run workflow
 cwl-runner --singularity --no-match-user --no-read-only --tmpdir-prefix {} --leave-tmpdir --timestamps {} {} > {} 2>&1
@@ -35,7 +53,15 @@ echo {{\\"exit_code\\": $?}} > {}
 python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
 """):
         self._ades_id = ades_id
-        self._ades_home_dir = os.path.join(base_ades_home_dir,
+        if base_ades_home_dir is None:
+            # Get ADES base home directory from the environment, or use a
+            # default if it is not set.
+            self._base_ades_home_dir = os.environ.get("ADES_HOME",
+                                                      default="./ades")
+        else:
+            # Get ADES base home directory from the parameter setting.
+            self._base_ades_home_dir = base_ades_home_dir
+        self._ades_home_dir = os.path.join(self._base_ades_home_dir,
                                            self._ades_id)
         if not os.path.isdir(self._ades_home_dir):
             os.mkdir(self._ades_home_dir)
@@ -54,28 +80,71 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         self._pbs_qsub_cmd = pbs_qsub_cmd
         self._pbs_qdel_cmd = pbs_qdel_cmd
         self._pbs_qstat_cmd = pbs_qstat_cmd
+        if pbs_qname is None:
+            # Get name of PBS queue to use from the environment, or use
+            # a default if it is not set.
+            self._pbs_qname = os.environ.get("ADES_PBS_QUEUE",
+                                             default="normal")
+        else:
+            # Get name of PBS queue to use from the parameter setting.
+            self._pbs_qname = pbs_qname
+        if pbs_qname_cache is None:
+            # Get name of PBS queue to use for the input data caching step
+            # from the environment. Use the same queue as the regular
+            # workflow as a default if it is not set.
+            self._pbs_qname_cache = os.environ.get("ADES_PBS_QUEUE_CACHE",
+                                                   default=self._pbs_qname)
+        else:
+            # Get name of PBS queue to use for the input data caching step
+            # from the parameter setting.
+            self._pbs_qname_cache = pbs_qname_cache
+        self._pbs_qname_cache_step = self._pbs_qname
+        self._cache_cwl_fname = cache_cwl_fname
+        self._cache_dir = \
+            os.path.realpath(os.path.join(self._base_ades_home_dir, cache_dir))
         self._exit_code_fname = exit_code_fname
         self._cwl_runner_log_fname = cwl_runner_log_fname
+        self._cwl_runner_cache_log_fname = \
+            os.path.splitext(cwl_runner_log_fname)[0] + "_cache.log"
         self._metrics_fname = metrics_fname
         self._pbs_script_stub = pbs_script_stub
+        if default_stageout_bucket is None:
+            # Get default stage-out bucket from the environment.
+            self._default_stageout_bucket = \
+                os.environ.get("ADES_DEFAULT_BUCKET_STAGEOUT", default="")
+        else:
+            self._default_stageout_bucket = default_stageout_bucket
+        self._default_stageout_url = \
+            os.path.join("s3://", self._default_stageout_bucket, self._ades_id)
+        self._ltak_relpath = ltak_relpath
+        self._aws_config = { "class": "Directory",
+                            "path": self._ltak_relpath }
 
     def _construct_sif_name(self, docker_url):
         sif_name = os.path.basename(docker_url).replace(':', '_') + ".sif"
         return os.path.join(self._sing_stash_dir, sif_name)
 
     def _construct_workdir(self, job_id):
-        return os.path.abspath(os.path.join(self._base_work_dir, job_id))
+        # The outer os.path.join with the empty string ensures that 
+        # the returned path has a trailing '/'.  That seemed to be necessary 
+        # for the cwl-runner --tmpdir-prefix option.
+        return os.path.join(os.path.realpath(os.path.join(self._base_work_dir,
+                                                          job_id)), '')
 
     def _construct_pbs_job_id_from_qsub_stdout(self, qsub_stdout):
         return '.'.join(qsub_stdout.strip().split('.')[:2])
         
+    def _construct_cache_cwl_url(self, workflow_cwl_url):
+        return os.path.join(os.path.dirname(workflow_cwl_url),
+                            self._cache_cwl_fname)
+
     def _validate_workdir(self, work_dir):
         if (os.path.isdir(work_dir) and
             os.path.isfile(os.path.join(work_dir, self._pbs_script_fname))):
-            work_dir_abspath = os.path.abspath(work_dir)
-            base_work_dir_abspath = os.path.abspath(self._base_work_dir)
-            return (len(work_dir_abspath) > len(base_work_dir_abspath) and 
-                    work_dir_abspath.startswith(base_work_dir_abspath))
+            work_dir_realpath = os.path.realpath(work_dir)
+            base_work_dir_realpath = os.path.realpath(self._base_work_dir)
+            return (len(work_dir_realpath) > len(base_work_dir_realpath) and
+                    work_dir_realpath.startswith(base_work_dir_realpath))
         else:
             return False
 
@@ -85,8 +154,14 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
             shutil.rmtree(work_dir)
 
     def _pbs_job_state_to_status_str(self, work_dir, job_state):
+        # Typical sequence:
+        # Job begins in the Q/queued state.
+        # Job enters H/held state when preprocessing/caching directive is run
+        # Job enters R/running state when main workflow is run
+        # Job enters E/exiting state before completing
         pbs_job_state_to_status = {
             "Q": "accepted",
+            "H": "accepted",
             "R": "running",
             "E": "running",
         }
@@ -154,22 +229,39 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
 
         # Write job inputs to a JSON file in the work directory.
         job_inputs_fname = os.path.join(work_dir, self._job_inputs_fname)
+        job_inputs = job_spec["inputs"]
+
+        # Inject cache directory location into job inputs.
+        job_inputs["cache_dir"] = {"class": "Directory",
+                                   "path": self._cache_dir}
+
+        # If stage_out information is not provided, inject it automatically
+        # assuming a default S3 bucket and LTAK.
+        if "stage_out" not in job_inputs:
+            job_inputs["stage_out"] = \
+                { "s3_url": os.path.join(self._default_stageout_url,
+                                         job_id, "output"),
+                  "aws_config": self._aws_config }
+        elif "aws_config" not in job_inputs["stage_out"]:
+            job_inputs["stage_out"]["aws_config"] = self._aws_config
+
         with open(job_inputs_fname, 'w', encoding='utf-8') as job_inputs_file:
             json.dump(job_spec['inputs'], job_inputs_file, ensure_ascii=False,
                       indent=4)
 
         # Create PBS script in the work directory.
         pbs_script_fname = os.path.join(work_dir, self._pbs_script_fname)
+        workflow_cwl_url = job_spec['process']['owsContextURL']
+        cache_cwl_url = self._construct_cache_cwl_url(workflow_cwl_url)
         with open(pbs_script_fname, 'w') as pbs_script_file:
-            # The second format string below is the cwl-runner's tmpdir-prefix,
-            # which we set to the same as the work directory.  The os.path.join
-            # with '' is a trick to ensure that the trailing slash is included
-            # in the path.
             pbs_script_file.write(self._pbs_script_stub.\
-                                  format(work_dir, 
-                                         os.path.join(work_dir, ''),
-                                         job_spec['process']['owsContextURL'],
+                                  format(self._pbs_qname_cache, work_dir,
+                                         work_dir, cache_cwl_url,
                                          job_inputs_fname,
+                                         self._cwl_runner_cache_log_fname,
+                                         self._pbs_qname,
+                                         work_dir, work_dir,
+                                         workflow_cwl_url, job_inputs_fname,
                                          self._cwl_runner_log_fname,
                                          self._exit_code_fname,
                                          self._cwl_runner_log_fname,
@@ -189,7 +281,7 @@ python -m flask_ades_wpst.get_pbs_metrics -l {} -m {} -e {}
         else:
             pbs_job_id = 'none'
             status = 'failed'
-            
+
         return {'pbs_job_id': pbs_job_id, 'status': status, 'error': error}
 
     def dismiss_job(self, job_spec):
